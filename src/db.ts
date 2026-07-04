@@ -65,6 +65,7 @@ export function openDb(path?: string): Database.Database {
   if (p !== ":memory:") mkdirSync(dirname(p), { recursive: true });
   const db = new Database(p);
   db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
   db.exec(SCHEMA);
   return db;
 }

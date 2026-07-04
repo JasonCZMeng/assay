@@ -112,4 +112,27 @@ describe("ingestBazaar", () => {
     expect(row.name).toBe("Legacy API"); // from metadata.name
     expect(row.category).toBe("legacy"); // from metadata.category
   });
+
+  it("skips a malformed item (bad resource URL) without aborting the run", async () => {
+    const db = openDb(":memory:");
+    const malformedItem = {
+      ...item("http://[invalid"), // fails `new URL()` inside the per-item body
+      resource: "http://[invalid",
+    };
+    const fakeFetch = (async () =>
+      page(
+        [item("https://api.example.com/good-1"), malformedItem, item("https://api.example.com/good-2")],
+        { limit: 100, offset: 0, total: 3 }
+      )) as typeof fetch;
+
+    const r = await ingestBazaar(db, fakeFetch);
+
+    expect(r.upserted).toBe(2); // the two well-formed items still made it in
+    const count: any = db.prepare("SELECT COUNT(*) c FROM services").get();
+    expect(count.c).toBe(2);
+    for (const id of ["https://api.example.com/good-1", "https://api.example.com/good-2"]) {
+      const row = db.prepare("SELECT id FROM services WHERE id=?").get(id);
+      expect(row).toBeTruthy();
+    }
+  });
 });

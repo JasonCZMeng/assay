@@ -16,6 +16,21 @@ export function spentTodayUsdc(db: Database.Database, now: number): number {
   return r.s;
 }
 
+// Hard cap on any single x402 payment the prober will make, in 6-decimal atomic USDC units
+// (0.05 USDC). Guards against a malicious or misconfigured service demanding an outsized amount.
+export const HARD_CAP_USDC_UNITS = 50_000n;
+
+// Pure helper so the cap check is unit-testable without going through x402Client/hooks.
+export function withinCap(amountUnits: bigint | string | number): boolean {
+  let n: bigint;
+  try {
+    n = typeof amountUnits === "bigint" ? amountUnits : BigInt(amountUnits);
+  } catch {
+    return false; // unparsable amount — fail closed
+  }
+  return n >= 0n && n <= HARD_CAP_USDC_UNITS;
+}
+
 // Real paying fetch. `@x402/fetch` v2's `wrapFetchWithPayment(fetch, client)` takes an
 // `x402Client` (or `x402HTTPClient`) built via the builder pattern, not an account directly
 // (confirmed against node_modules/@x402/fetch/README.md — the brief's `wrapFetchWithPayment(fetch,
@@ -29,7 +44,23 @@ export function makePayFetch(): typeof fetch {
     // Never echo the raw exception — it can contain fragments of the private key.
     throw new Error("invalid probe wallet key");
   }
-  const client = new x402Client().register("eip155:*", new ExactEvmScheme(account));
+  // Only the network we actually pay on — registering a wildcard would let a service demand
+  // payment on a chain we never intended to send funds on.
+  const client = new x402Client()
+    .register("eip155:8453", new ExactEvmScheme(account))
+    // `onBeforePaymentCreation` (confirmed in node_modules/@x402/core's x402Client-*.d.ts) fires
+    // right before a payment payload is built for the selected requirement. Returning
+    // `{ abort: true, reason }` makes `createPaymentPayload` throw, which surfaces through
+    // `wrapFetchWithPayment` as a rejected fetch — caught by runProbes' try/catch below and
+    // recorded as a failed probe instead of paying.
+    .onBeforePaymentCreation(async ({ selectedRequirements }) => {
+      if (!withinCap(selectedRequirements.amount)) {
+        return {
+          abort: true,
+          reason: `payment amount ${selectedRequirements.amount} exceeds hard cap ${HARD_CAP_USDC_UNITS}`,
+        };
+      }
+    });
   return wrapFetchWithPayment(fetch, client);
 }
 
@@ -47,12 +78,9 @@ export async function runProbes(
   const now = deps.now ?? Date.now;
   const judge = deps.judge ?? judgeResponse;
 
-  if (spentTodayUsdc(db, now()) >= config.dailyBudgetUsdc) {
-    console.error(`[prober] daily budget reached — halting`);
-    return { probed: 0, skipped: "budget" };
-  }
-
-  const payFetch = deps.payFetch ?? makePayFetch();
+  // Lazily built: only construct the paying fetch once we know at least one probe will run,
+  // so a budget that's already exhausted never touches the wallet key.
+  let payFetch = deps.payFetch;
 
   const insert = db.prepare(`
     INSERT INTO probes (service_id, ts, ok_settlement, ok_schema, gt_deviation_pct, llm_score,
@@ -62,6 +90,15 @@ export async function runProbes(
 
   let probed = 0;
   for (const t of getTemplates(db)) {
+    // Re-check before every probe (not just once at the top of the run): a long run can cross
+    // the daily budget mid-loop as earlier probes' costs land, and we must stop immediately
+    // rather than keep paying past the cap.
+    if (spentTodayUsdc(db, now()) >= config.dailyBudgetUsdc) {
+      console.error(`[prober] daily budget reached — halting`);
+      return { probed, skipped: "budget" };
+    }
+    if (!payFetch) payFetch = makePayFetch();
+
     const price: any = db.prepare("SELECT price_usdc FROM services WHERE id=?").get(t.serviceId);
     const cost = price?.price_usdc ?? 0;
     const started = now();
@@ -104,12 +141,17 @@ export async function runProbes(
     let llm: number | null = null;
     if (okSettlement) {
       let json: unknown = null;
+      let parseFailed = false;
       try {
         json = JSON.parse(body);
       } catch {
-        okSchema = 0;
+        parseFailed = true;
       }
-      if (json !== null) {
+      if (parseFailed || json === null) {
+        // A parse failure and a literal `null` body are both schema failures: a paid endpoint
+        // that returns nothing usable didn't satisfy its contract — this isn't "not run".
+        okSchema = 0;
+      } else {
         okSchema = evalSchema(json, t.responseSchema) ? 1 : 0;
         if (t.groundTruth) gtDev = await evalGroundTruth(json, t.groundTruth, deps.refFetch);
       }

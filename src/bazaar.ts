@@ -13,38 +13,54 @@ export async function ingestBazaar(
     ON CONFLICT(id) DO UPDATE SET
       last_seen=@now, raw=@raw, price_usdc=@price_usdc, name=@name, category=@category, network=@network
   `);
+  const PAGE_CAP = 300;
   let upserted = 0;
+  let malformed = 0;
   let offset = 0;
-  for (let pageN = 0; pageN < 50; pageN++) {
+  // Tracks whether the loop ran out of pages (cap hit) vs. broke out because the walk
+  // legitimately finished — used below to warn about un-ingested items.
+  let capExhausted = true;
+  let lastTotal: number | undefined;
+  let lastNextOffset = offset;
+  for (let pageN = 0; pageN < PAGE_CAP; pageN++) {
     const res = await fetchFn(`${BAZAAR_URL}?limit=100&offset=${offset}`);
     if (!res.ok) throw new Error(`Bazaar ingest failed: HTTP ${res.status}`);
     const data: any = await res.json();
     const items: any[] = data.items ?? [];
     const now = Date.now();
     for (const it of items) {
-      const url: string = it.resource;
-      if (!url?.startsWith("http")) continue;
-      const accept = it.accepts?.[0] ?? {};
-      // Real Bazaar shape: serviceName, tags[], accepts[{amount, network, asset}]
-      // Fallback: metadata.name, metadata.category, accepts[{maxAmountRequired}]
-      const name = it.serviceName ?? it.metadata?.name ?? null;
-      const tags = Array.isArray(it.tags) ? it.tags : [];
-      const category = tags.length > 0 ? tags[0] : (it.metadata?.category ?? null);
-      const amount = accept.amount ?? accept.maxAmountRequired;
-      const price_usdc = amount ? Number(amount) / 1e6 : null;
-      upsert.run({
-        id: url,
-        domain: new URL(url).hostname,
-        name,
-        category,
-        price_usdc,
-        network: accept.network ?? null,
-        now,
-        raw: JSON.stringify(it),
-      });
-      upserted++;
+      // A single malformed item (bad resource URL, etc.) must not abort the whole ingest run —
+      // skip it, count it, and keep going.
+      try {
+        const url: string = it.resource;
+        if (!url?.startsWith("http")) continue;
+        const accept = it.accepts?.[0] ?? {};
+        // Real Bazaar shape: serviceName, tags[], accepts[{amount, network, asset}]
+        // Fallback: metadata.name, metadata.category, accepts[{maxAmountRequired}]
+        const name = it.serviceName ?? it.metadata?.name ?? null;
+        const tags = Array.isArray(it.tags) ? it.tags : [];
+        const category = tags.length > 0 ? tags[0] : (it.metadata?.category ?? null);
+        const amount = accept.amount ?? accept.maxAmountRequired;
+        const price_usdc = amount ? Number(amount) / 1e6 : null;
+        upsert.run({
+          id: url,
+          domain: new URL(url).hostname,
+          name,
+          category,
+          price_usdc,
+          network: accept.network ?? null,
+          now,
+          raw: JSON.stringify(it),
+        });
+        upserted++;
+      } catch {
+        malformed++;
+      }
     }
-    if (items.length === 0) break;
+    if (items.length === 0) {
+      capExhausted = false;
+      break;
+    }
     // Real API contract (verified live): top-level `pagination: { limit, offset, total }`,
     // not a `nextOffset` field. Advance by the page's own limit and stop once we've
     // passed the reported total. Use a null/undefined check, not falsiness, so a
@@ -53,8 +69,24 @@ export async function ingestBazaar(
     const pageLimit: number = pagination.limit ?? items.length;
     const total: number | undefined = pagination.total;
     const nextOffset = offset + pageLimit;
-    if (total !== null && total !== undefined && nextOffset >= total) break;
+    lastTotal = total;
+    lastNextOffset = nextOffset;
+    if (total !== null && total !== undefined && nextOffset >= total) {
+      capExhausted = false;
+      break;
+    }
     offset = nextOffset;
+  }
+  if (capExhausted) {
+    if (lastTotal !== undefined) {
+      const remaining = Math.max(0, lastTotal - lastNextOffset);
+      console.warn(`[bazaar] page cap (${PAGE_CAP}) reached — ${remaining} item(s) not ingested`);
+    } else {
+      console.warn(`[bazaar] page cap (${PAGE_CAP}) reached — remaining item count unknown`);
+    }
+  }
+  if (malformed > 0) {
+    console.warn(`[bazaar] skipped ${malformed} malformed item(s)`);
   }
   return { upserted };
 }

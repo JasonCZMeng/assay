@@ -12,7 +12,7 @@
     }
   },
   "groundTruth": {
-    "path": "data.price",
+    "path": "price",
     "refSource": "coingecko",
     "refId": "ethereum",
     "refField": "usd",

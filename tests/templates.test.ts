@@ -51,4 +51,35 @@ describe("templates", () => {
     const validPayloadGet = { ...validPayload, method: "GET" };
     expect(() => saveTemplate(db, validPayloadGet as any)).not.toThrow();
   });
+
+  it("throws when saving a template for a service that was never seeded", () => {
+    const db = openDb(":memory:");
+    expect(() =>
+      saveTemplate(db, {
+        serviceId: "https://ghost.example/a",
+        method: "GET",
+        url: "https://ghost.example/a",
+        headers: {},
+        responseSchema: { type: "object" },
+      })
+    ).toThrow("unknown service: https://ghost.example/a");
+  });
+
+  it("omits templates for retired services", () => {
+    const db = openDb(":memory:");
+    seedService(db, "https://api.example.com/retiring");
+    saveTemplate(db, {
+      serviceId: "https://api.example.com/retiring",
+      method: "GET",
+      url: "https://api.example.com/retiring",
+      headers: {},
+      responseSchema: { type: "object" },
+    });
+    expect(getTemplates(db)).toHaveLength(1);
+
+    db.prepare("UPDATE services SET status='retired' WHERE id=?").run(
+      "https://api.example.com/retiring"
+    );
+    expect(getTemplates(db)).toHaveLength(0);
+  });
 });

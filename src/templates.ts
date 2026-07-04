@@ -23,6 +23,8 @@ export type ProbeTemplate = z.infer<typeof ProbeTemplateSchema>;
 
 export function saveTemplate(db: Database.Database, input: ProbeTemplate): void {
   const t = ProbeTemplateSchema.parse(input);
+  const service = db.prepare("SELECT 1 FROM services WHERE id=?").get(t.serviceId);
+  if (!service) throw new Error(`unknown service: ${t.serviceId}`);
   db.prepare(`
     INSERT INTO probe_templates (service_id, method, url, headers, body, response_schema, ground_truth, llm_rubric, created_at)
     VALUES (?,?,?,?,?,?,?,?,?)
@@ -39,14 +41,23 @@ export function saveTemplate(db: Database.Database, input: ProbeTemplate): void 
 }
 
 export function getTemplates(db: Database.Database): ProbeTemplate[] {
-  return db.prepare("SELECT * FROM probe_templates").all().map((r: any) => ({
-    serviceId: r.service_id,
-    method: r.method,
-    url: r.url,
-    headers: JSON.parse(r.headers),
-    body: r.body ?? undefined,
-    responseSchema: JSON.parse(r.response_schema),
-    groundTruth: r.ground_truth ? JSON.parse(r.ground_truth) : undefined,
-    llmRubric: r.llm_rubric ?? undefined,
-  }));
+  // Only probe services still under curation — retiring a service (status='retired') must stop
+  // probing it immediately without needing to delete its template.
+  return db
+    .prepare(
+      `SELECT pt.* FROM probe_templates pt
+       JOIN services s ON s.id = pt.service_id
+       WHERE s.status = 'curated'`
+    )
+    .all()
+    .map((r: any) => ({
+      serviceId: r.service_id,
+      method: r.method,
+      url: r.url,
+      headers: JSON.parse(r.headers),
+      body: r.body ?? undefined,
+      responseSchema: JSON.parse(r.response_schema),
+      groundTruth: r.ground_truth ? JSON.parse(r.ground_truth) : undefined,
+      llmRubric: r.llm_rubric ?? undefined,
+    }));
 }
