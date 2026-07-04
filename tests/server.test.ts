@@ -51,4 +51,44 @@ describe("server", () => {
     expect(j.ok).toBe(true);
     expect(j.services).toBe(1);
   });
+
+  it("regression: decodes service ids with encoded substrings correctly", async () => {
+    const db = openDb(":memory:");
+    // Seed a service whose id contains an encoded substring
+    const serviceId = "https://svc.example/a?next=https%3A%2F%2Fother.example";
+    db.prepare(
+      "INSERT INTO services (id, domain, status, first_seen, last_seen, raw) VALUES (?,?,?,?,?,?)"
+    ).run(serviceId, "svc.example", "curated", 1, 1, "{}");
+    const ins = db.prepare(
+      "INSERT INTO probes (service_id, ts, ok_settlement, ok_schema, usdc_cost) VALUES (?,?,1,1,0.005)"
+    );
+    for (let i = 0; i < 25; i++) ins.run(serviceId, Date.now() - i * 3600_000);
+    computeScores(db);
+
+    const app = buildApp(db);
+    const res = await app.request(`/score/${encodeURIComponent(serviceId)}`);
+    expect(res.status).toBe(200);
+    const j: any = await res.json();
+    expect(j.service).toBe(serviceId);
+  });
+
+  it("leaderboard escapes html in service domains", async () => {
+    const db = openDb(":memory:");
+    const maliciousDomain = "<script>alert(1)</script>.evil.com";
+    db.prepare(
+      "INSERT INTO services (id, domain, status, first_seen, last_seen, raw) VALUES (?,?,?,?,?,?)"
+    ).run("https://evil.example/x", maliciousDomain, "curated", 1, 1, "{}");
+    const ins = db.prepare(
+      "INSERT INTO probes (service_id, ts, ok_settlement, ok_schema, usdc_cost) VALUES (?,?,1,1,0.005)"
+    );
+    for (let i = 0; i < 25; i++) ins.run("https://evil.example/x", Date.now() - i * 3600_000);
+    computeScores(db);
+
+    const app = buildApp(db);
+    const res = await app.request("/leaderboard");
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toContain("&lt;script&gt;");
+    expect(text).not.toContain("<script>alert");
+  });
 });

@@ -49,7 +49,7 @@ export function buildApp(db: Database.Database): Hono {
   }
 
   app.get("/tier/:id", (c) => {
-    const id = decodeURIComponent(c.req.param("id"));
+    const id = c.req.param("id");
     const s = latestScore(db, id);
     if (!s) return c.json({ error: "unknown service" }, 404);
     c.header("Cache-Control", "public, max-age=3600");
@@ -57,7 +57,7 @@ export function buildApp(db: Database.Database): Hono {
   });
 
   app.get("/score/:id", (c) => {
-    const id = decodeURIComponent(c.req.param("id"));
+    const id = c.req.param("id");
     const s = latestScore(db, id);
     if (!s) return c.json({ error: "unknown service" }, 404);
     return c.json({ service: id, ...s });
