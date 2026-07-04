@@ -38,8 +38,17 @@ describe("templates", () => {
   it("rejects invalid method", () => {
     const db = openDb(":memory:");
     seedService(db, "https://x.com/a");
-    expect(() =>
-      saveTemplate(db, { serviceId: "https://x.com/a", method: "DELETE" } as any)
-    ).toThrow();
+    const validPayload = {
+      serviceId: "https://x.com/a",
+      url: "https://x.com/a",
+      headers: {},
+      responseSchema: { type: "object" },
+      method: "DELETE",
+    };
+    expect(() => saveTemplate(db, validPayload as any)).toThrow();
+
+    // Verify the same payload with valid method does NOT throw
+    const validPayloadGet = { ...validPayload, method: "GET" };
+    expect(() => saveTemplate(db, validPayloadGet as any)).not.toThrow();
   });
 });

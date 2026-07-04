@@ -9,11 +9,19 @@ const db = openDb();
 const [cmd, ...args] = process.argv.slice(2);
 
 if (cmd === "list") {
-  const rows = db
-    .prepare(
-      "SELECT id, domain, category, price_usdc FROM services WHERE status='discovered' ORDER BY domain LIMIT 100"
-    )
-    .all();
+  let query =
+    "SELECT id, domain, category, price_usdc FROM services WHERE status='discovered'";
+  const params: any[] = [];
+
+  const categoryIdx = args.indexOf("--category");
+  if (categoryIdx !== -1 && categoryIdx + 1 < args.length) {
+    query += " AND category = ?";
+    params.push(args[categoryIdx + 1]);
+  }
+
+  query += " ORDER BY domain LIMIT 100";
+
+  const rows = db.prepare(query).all(...params);
   for (const r of rows as any[])
     console.log(`${r.domain}\t$${r.price_usdc ?? "?"}\t${r.category ?? "-"}\t${r.id}`);
 } else if (cmd === "add") {
