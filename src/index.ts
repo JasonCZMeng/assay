@@ -19,7 +19,11 @@ async function probeAndScore() {
   await new Promise((r) => setTimeout(r, jitterMs));
   const r = await runProbes(db).catch((e) => (console.error("[probe]", e), null));
   if (r) console.log(`[probe] probed=${r.probed} skipped=${r.skipped ?? "no"}`);
-  console.log(`[score] scored ${computeScores(db)} services`);
+  try {
+    console.log(`[score] scored ${computeScores(db)} services`);
+  } catch (e) {
+    console.error("[score]", e);
+  }
 }
 for (const c of ["15 6 * * *", "15 13 * * *", "15 21 * * *"]) cron.schedule(c, probeAndScore);
 

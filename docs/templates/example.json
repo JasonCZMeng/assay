@@ -3,7 +3,13 @@
   "url": "https://example-x402-service.com/v1/price/eth",
   "headers": {},
   "responseSchema": {
-    "type": "object"
+    "type": "object",
+    "required": ["price"],
+    "properties": {
+      "price": {
+        "type": "number"
+      }
+    }
   },
   "groundTruth": {
     "path": "data.price",
