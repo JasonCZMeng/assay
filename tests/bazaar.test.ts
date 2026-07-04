@@ -12,16 +12,27 @@ const page = (items: any[], pagination: { limit: number; offset: number; total: 
     headers: { "content-type": "application/json" },
   });
 
+// Real Bazaar item shape (verified live): serviceName, tags[], accepts[{amount, network, asset}]
 const item = (url: string) => ({
   resource: url,
   type: "http",
   x402Version: 2,
-  accepts: [{ maxAmountRequired: "5000", network: "base", asset: "USDC" }],
-  metadata: { name: "Price API", category: "data" },
+  serviceName: "Price API",
+  tags: ["data"],
+  accepts: [{ amount: "5000", network: "eip155:8453", asset: "USDC" }],
+});
+
+// Legacy Bazaar item shape: metadata.name, metadata.category, accepts[{maxAmountRequired}]
+const legacyItem = (url: string) => ({
+  resource: url,
+  type: "http",
+  x402Version: 2,
+  metadata: { name: "Legacy API", category: "legacy" },
+  accepts: [{ maxAmountRequired: "2000", network: "base", asset: "USDC" }],
 });
 
 describe("ingestBazaar", () => {
-  it("upserts services and preserves status on re-ingest", async () => {
+  it("upserts services and preserves status on re-ingest (real Bazaar shape)", async () => {
     const db = openDb(":memory:");
     const fakeFetch = (async () =>
       page([item("https://api.example.com/price")], { limit: 100, offset: 0, total: 1 })) as typeof fetch;
@@ -34,11 +45,13 @@ describe("ingestBazaar", () => {
     );
     await ingestBazaar(db, fakeFetch);
     const row: any = db
-      .prepare("SELECT status, domain, price_usdc FROM services WHERE id=?")
+      .prepare("SELECT status, domain, price_usdc, name, category FROM services WHERE id=?")
       .get("https://api.example.com/price");
     expect(row.status).toBe("curated"); // not clobbered
     expect(row.domain).toBe("api.example.com");
     expect(row.price_usdc).toBeCloseTo(0.005); // 5000 units of 6-decimal USDC
+    expect(row.name).toBe("Price API"); // mapped from serviceName
+    expect(row.category).toBe("data"); // mapped from tags[0]
   });
 
   it("walks multiple pages using the real pagination.total field and upserts every item", async () => {
@@ -82,5 +95,21 @@ describe("ingestBazaar", () => {
       new Response("boom", { status: 500 })) as typeof fetch;
 
     await expect(ingestBazaar(db, fakeFetch)).rejects.toThrow("HTTP 500");
+  });
+
+  it("falls back to legacy metadata shape (maxAmountRequired, metadata.name/category)", async () => {
+    const db = openDb(":memory:");
+    const fakeFetch = (async () =>
+      page([legacyItem("https://api.example.com/legacy")], { limit: 100, offset: 0, total: 1 })) as typeof fetch;
+
+    const r = await ingestBazaar(db, fakeFetch);
+    expect(r.upserted).toBe(1);
+
+    const row: any = db
+      .prepare("SELECT price_usdc, name, category FROM services WHERE id=?")
+      .get("https://api.example.com/legacy");
+    expect(row.price_usdc).toBeCloseTo(0.002); // 2000 units of 6-decimal USDC
+    expect(row.name).toBe("Legacy API"); // from metadata.name
+    expect(row.category).toBe("legacy"); // from metadata.category
   });
 });

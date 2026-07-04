@@ -25,12 +25,19 @@ export async function ingestBazaar(
       const url: string = it.resource;
       if (!url?.startsWith("http")) continue;
       const accept = it.accepts?.[0] ?? {};
+      // Real Bazaar shape: serviceName, tags[], accepts[{amount, network, asset}]
+      // Fallback: metadata.name, metadata.category, accepts[{maxAmountRequired}]
+      const name = it.serviceName ?? it.metadata?.name ?? null;
+      const tags = Array.isArray(it.tags) ? it.tags : [];
+      const category = tags.length > 0 ? tags[0] : (it.metadata?.category ?? null);
+      const amount = accept.amount ?? accept.maxAmountRequired;
+      const price_usdc = amount ? Number(amount) / 1e6 : null;
       upsert.run({
         id: url,
         domain: new URL(url).hostname,
-        name: it.metadata?.name ?? null,
-        category: it.metadata?.category ?? null,
-        price_usdc: accept.maxAmountRequired ? Number(accept.maxAmountRequired) / 1e6 : null,
+        name,
+        category,
+        price_usdc,
         network: accept.network ?? null,
         now,
         raw: JSON.stringify(it),
