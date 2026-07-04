@@ -1,0 +1,15 @@
+{
+  "method": "GET",
+  "url": "https://example-x402-service.com/v1/price/eth",
+  "headers": {},
+  "responseSchema": {
+    "type": "object"
+  },
+  "groundTruth": {
+    "path": "data.price",
+    "refSource": "coingecko",
+    "refId": "ethereum",
+    "refField": "usd",
+    "tolerancePct": 1.5
+  }
+}
