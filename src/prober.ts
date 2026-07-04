@@ -20,6 +20,9 @@ export function spentTodayUsdc(db: Database.Database, now: number): number {
 // (0.05 USDC). Guards against a malicious or misconfigured service demanding an outsized amount.
 export const HARD_CAP_USDC_UNITS = 50_000n;
 
+// Base USDC token address on Ethereum L2 chain (Coinbase chain, eip155:8453)
+export const BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+
 // Pure helper so the cap check is unit-testable without going through x402Client/hooks.
 export function withinCap(amountUnits: bigint | string | number): boolean {
   let n: bigint;
@@ -29,6 +32,31 @@ export function withinCap(amountUnits: bigint | string | number): boolean {
     return false; // unparsable amount — fail closed
   }
   return n >= 0n && n <= HARD_CAP_USDC_UNITS;
+}
+
+// Pure helper to validate payment requirements: amount must be within cap and asset must be BASE_USDC.
+// Returns { ok: true } if allowed, or { ok: false, reason } if denied.
+export function paymentAllowed(req: {
+  amount?: string | bigint | number;
+  asset?: string;
+}): { ok: true } | { ok: false; reason: string } {
+  // Check asset is BASE_USDC (case-insensitive comparison)
+  if (!req.asset || req.asset.toLowerCase() !== BASE_USDC.toLowerCase()) {
+    return {
+      ok: false,
+      reason: `asset ${req.asset || "undefined"} is not BASE_USDC ${BASE_USDC}`,
+    };
+  }
+
+  // Check amount is within cap
+  if (!withinCap(req.amount ?? 0)) {
+    return {
+      ok: false,
+      reason: `payment amount ${req.amount} exceeds hard cap ${HARD_CAP_USDC_UNITS}`,
+    };
+  }
+
+  return { ok: true };
 }
 
 // Real paying fetch. `@x402/fetch` v2's `wrapFetchWithPayment(fetch, client)` takes an
@@ -54,10 +82,11 @@ export function makePayFetch(): typeof fetch {
     // `wrapFetchWithPayment` as a rejected fetch — caught by runProbes' try/catch below and
     // recorded as a failed probe instead of paying.
     .onBeforePaymentCreation(async ({ selectedRequirements }) => {
-      if (!withinCap(selectedRequirements.amount)) {
+      const check = paymentAllowed(selectedRequirements);
+      if (!check.ok) {
         return {
           abort: true,
-          reason: `payment amount ${selectedRequirements.amount} exceeds hard cap ${HARD_CAP_USDC_UNITS}`,
+          reason: check.reason,
         };
       }
     });

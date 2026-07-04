@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { openDb } from "../src/db.js";
 import { saveTemplate } from "../src/templates.js";
-import { runProbes, spentTodayUsdc, withinCap, HARD_CAP_USDC_UNITS } from "../src/prober.js";
+import { runProbes, spentTodayUsdc, withinCap, paymentAllowed, HARD_CAP_USDC_UNITS, BASE_USDC } from "../src/prober.js";
 
 function seed(db: any) {
   db.prepare(
@@ -129,5 +129,72 @@ describe("withinCap", () => {
 
   it("fails closed on unparsable amounts", () => {
     expect(withinCap("not-a-number")).toBe(false);
+  });
+});
+
+describe("paymentAllowed", () => {
+  it("rejects payments with a different asset address", () => {
+    const result = paymentAllowed({
+      asset: "0x1234567890123456789012345678901234567890",
+      amount: "1000",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("is not BASE_USDC");
+    }
+  });
+
+  it("accepts payments with BASE_USDC in lowercase", () => {
+    const result = paymentAllowed({
+      asset: BASE_USDC.toLowerCase(),
+      amount: "1000",
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts payments with BASE_USDC in uppercase", () => {
+    const result = paymentAllowed({
+      asset: BASE_USDC.toUpperCase(),
+      amount: "1000",
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts payments with BASE_USDC in mixed case", () => {
+    const result = paymentAllowed({
+      asset: BASE_USDC,
+      amount: "1000",
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects payments with BASE_USDC but amount exceeding the cap", () => {
+    const result = paymentAllowed({
+      asset: BASE_USDC,
+      amount: "100000",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("exceeds hard cap");
+    }
+  });
+
+  it("accepts payments with BASE_USDC and amount within the cap", () => {
+    const result = paymentAllowed({
+      asset: BASE_USDC,
+      amount: "50000",
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects payments with missing asset", () => {
+    const result = paymentAllowed({
+      asset: undefined,
+      amount: "1000",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("is not BASE_USDC");
+    }
   });
 });
