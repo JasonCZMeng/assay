@@ -24,9 +24,9 @@ export async function judgeResponse(
       ],
     });
     const text = msg.content[0]?.type === "text" ? msg.content[0].text.trim() : "";
-    const n = Number(text.match(/\d+(?:\.\d+)?|\.\d+/)?.[0]);
-    if (!Number.isFinite(n)) return null;
-    return Math.min(1, Math.max(0, n));
+    // Accept ONLY a standalone decimal in [0,1]: whole match against anchored pattern
+    if (!/^(0(\.\d+)?|1(\.0+)?|\.\d+)$/.test(text)) return null;
+    return Number(text);
   } catch {
     return null;
   }
