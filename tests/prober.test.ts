@@ -46,6 +46,20 @@ describe("runProbes", () => {
     expect(p.http_status).toBe(500);
   });
 
+  it("records a rejected payFetch as an errored probe, not an unhandled rejection", async () => {
+    const db = openDb(":memory:");
+    seed(db);
+    const rejectFetch = (async () => {
+      throw new Error("network down");
+    }) as typeof fetch;
+    const r = await runProbes(db, { payFetch: rejectFetch, refFetch: cgFetch });
+    expect(r.probed).toBe(1);
+    const p: any = db.prepare("SELECT * FROM probes").get();
+    expect(p.ok_settlement).toBe(0);
+    expect(p.error).not.toBeNull();
+    expect(p.http_status).toBeNull();
+  });
+
   it("halts when daily budget is spent", async () => {
     const db = openDb(":memory:");
     seed(db);

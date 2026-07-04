@@ -22,7 +22,13 @@ export function spentTodayUsdc(db: Database.Database, now: number): number {
 // account)` shape does not exist). `ExactEvmScheme` lives in `@x402/evm`, which was not yet a
 // project dependency; added it at ^2.17.0 to match the other @x402/* packages.
 export function makePayFetch(): typeof fetch {
-  const account = privateKeyToAccount(config.probeWalletKey as `0x${string}`);
+  let account;
+  try {
+    account = privateKeyToAccount(config.probeWalletKey as `0x${string}`);
+  } catch {
+    // Never echo the raw exception — it can contain fragments of the private key.
+    throw new Error("invalid probe wallet key");
+  }
   const client = new x402Client().register("eip155:*", new ExactEvmScheme(account));
   return wrapFetchWithPayment(fetch, client);
 }
@@ -39,13 +45,14 @@ export async function runProbes(
   deps: Deps = {}
 ): Promise<{ probed: number; skipped: string | null }> {
   const now = deps.now ?? Date.now;
-  const payFetch = deps.payFetch ?? makePayFetch();
   const judge = deps.judge ?? judgeResponse;
 
   if (spentTodayUsdc(db, now()) >= config.dailyBudgetUsdc) {
     console.error(`[prober] daily budget reached — halting`);
     return { probed: 0, skipped: "budget" };
   }
+
+  const payFetch = deps.payFetch ?? makePayFetch();
 
   const insert = db.prepare(`
     INSERT INTO probes (service_id, ts, ok_settlement, ok_schema, gt_deviation_pct, llm_score,
@@ -65,23 +72,26 @@ export async function runProbes(
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 30_000);
-      const res = await payFetch(t.url, {
-        method: t.method,
-        headers: t.headers,
-        body: t.method === "POST" ? t.body : undefined,
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-      status = res.status;
-      body = await res.text();
-      // If the wrapped fetch surfaced an x402 settlement header, decode it for the tx hash.
-      const paymentResponseHeader = res.headers.get("PAYMENT-RESPONSE") ?? res.headers.get("X-PAYMENT-RESPONSE");
-      if (paymentResponseHeader) {
-        try {
-          paymentTx = decodePaymentResponseHeader(paymentResponseHeader)?.transaction ?? null;
-        } catch {
-          paymentTx = null;
+      try {
+        const res = await payFetch(t.url, {
+          method: t.method,
+          headers: t.headers,
+          body: t.method === "POST" ? t.body : undefined,
+          signal: controller.signal,
+        });
+        status = res.status;
+        body = await res.text();
+        // If the wrapped fetch surfaced an x402 settlement header, decode it for the tx hash.
+        const paymentResponseHeader = res.headers.get("PAYMENT-RESPONSE") ?? res.headers.get("X-PAYMENT-RESPONSE");
+        if (paymentResponseHeader) {
+          try {
+            paymentTx = decodePaymentResponseHeader(paymentResponseHeader)?.transaction ?? null;
+          } catch {
+            paymentTx = null;
+          }
         }
+      } finally {
+        clearTimeout(timer);
       }
     } catch (e: any) {
       error = String(e?.message ?? e).slice(0, 500);
