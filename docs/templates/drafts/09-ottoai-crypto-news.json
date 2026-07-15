@@ -1,0 +1,14 @@
+{
+  "method": "GET",
+  "url": "https://x402.ottoai.services/crypto-news",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["status", "data"],
+    "properties": {
+      "status": { "type": "string" },
+      "data": { "type": "object" }
+    }
+  },
+  "llmRubric": "The response should contain a real crypto market news report: specific named assets, projects, or events with concrete details (prices, percentages, announcements), ideally with sentiment or importance ranking. Score 1.0 for a substantive, specific, current-events report. Score 0.5 for generic market commentary with few specifics. Score 0.0 for empty content, placeholder text, an error, or content unrelated to crypto news."
+}

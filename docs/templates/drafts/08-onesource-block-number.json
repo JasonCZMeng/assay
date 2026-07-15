@@ -1,0 +1,19 @@
+{
+  "method": "GET",
+  "url": "https://api.onesource.io/api/chain/block-number?network=ethereum",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["data"],
+    "properties": {
+      "data": {
+        "type": "object",
+        "required": ["result"],
+        "properties": {
+          "result": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" }
+        }
+      }
+    }
+  },
+  "llmRubric": "The response reports the current Ethereum mainnet block height as a 0x-prefixed hex string (in a field like data.result). Reply with a score: 1.0 if it contains a plausible current block number (hex value whose decimal equivalent is above 20,000,000). 0.5 if the shape is right but the value looks stale or implausible. 0.0 if there is no block number, an error message, or placeholder data."
+}

@@ -1,0 +1,21 @@
+{
+  "method": "GET",
+  "url": "https://aiagentoracle.ai/api/v1/price/ETH",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["symbol", "priceUsd"],
+    "properties": {
+      "symbol": { "type": "string" },
+      "priceUsd": { "type": "number" },
+      "asOf": { "type": "string" }
+    }
+  },
+  "groundTruth": {
+    "path": "priceUsd",
+    "refSource": "coingecko",
+    "refId": "ethereum",
+    "refField": "usd",
+    "tolerancePct": 2
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "method": "GET",
+  "url": "https://crypto.apitoll.cloud/v1/crypto/price?coins=BTC",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["prices"],
+    "properties": {
+      "prices": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["price"],
+          "properties": {
+            "price": { "type": "number" },
+            "symbol": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "groundTruth": {
+    "path": "prices.0.price",
+    "refSource": "coingecko",
+    "refId": "bitcoin",
+    "refField": "usd",
+    "tolerancePct": 2
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "method": "GET",
+  "url": "https://api.anchor-x402.com/v1/price/token?symbol=ETH",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["symbol", "usd"],
+    "properties": {
+      "symbol": { "type": "string" },
+      "usd": { "type": "number" },
+      "name": { "type": "string" },
+      "source": { "type": "string" }
+    }
+  },
+  "groundTruth": {
+    "path": "usd",
+    "refSource": "coingecko",
+    "refId": "ethereum",
+    "refField": "usd",
+    "tolerancePct": 2
+  }
+}

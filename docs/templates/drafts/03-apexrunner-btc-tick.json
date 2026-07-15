@@ -1,0 +1,23 @@
+{
+  "method": "GET",
+  "url": "https://apexrunner.ai/signals/btc-price-tick",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["b", "e", "s", "t"],
+    "properties": {
+      "b": { "type": "number" },
+      "e": { "type": "number" },
+      "s": { "type": "number" },
+      "a": { "type": "number" },
+      "t": { "type": "integer" }
+    }
+  },
+  "groundTruth": {
+    "path": "b",
+    "refSource": "coingecko",
+    "refId": "bitcoin",
+    "refField": "usd",
+    "tolerancePct": 2
+  }
+}

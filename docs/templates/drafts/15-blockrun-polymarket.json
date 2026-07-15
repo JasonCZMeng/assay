@@ -1,0 +1,7 @@
+{
+  "method": "GET",
+  "url": "https://blockrun.ai/api/v1/pm/polymarket/markets",
+  "headers": {},
+  "responseSchema": { "type": ["object", "array"] },
+  "llmRubric": "The response should list real Polymarket prediction markets: each entry with a market question/title and pricing or probability data (outcome prices between 0 and 1, or percentages), ideally with volume or liquidity figures. Score 1.0 for a substantive list of plausible current markets with prices. Score 0.5 for a thin or partially populated list. Score 0.0 for empty results, placeholder content, or an error."
+}

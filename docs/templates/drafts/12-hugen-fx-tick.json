@@ -1,0 +1,7 @@
+{
+  "method": "GET",
+  "url": "https://tick.hugen.tokyo/tick/latest?symbol=EURUSD",
+  "headers": {},
+  "responseSchema": { "type": "object" },
+  "llmRubric": "The response should contain a current EUR/USD foreign-exchange quote with bid and/or ask prices. Score 1.0 if it reports EUR/USD prices in a plausible range (roughly 0.90 to 1.30) with bid below ask and a recent timestamp. Score 0.5 if a price is present but incomplete (missing bid/ask split or timestamp). Score 0.0 for values far outside the plausible range, placeholder data, or an error."
+}

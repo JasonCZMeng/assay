@@ -1,0 +1,24 @@
+{
+  "method": "GET",
+  "url": "https://x402.twit.sh/tweets/search?from=elonmusk&minLikes=100",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["data"],
+    "properties": {
+      "data": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["text"],
+          "properties": {
+            "text": { "type": "string" },
+            "author": { "type": "object" },
+            "public_metrics": { "type": "object" }
+          }
+        }
+      }
+    }
+  },
+  "llmRubric": "The response should contain real tweets authored by the account 'elonmusk', each with tweet text, engagement metrics (likes at or above 100), and timestamps. Score 1.0 if tweets look authentic and match the search filters. Score 0.5 if tweets are returned but filters appear ignored or metadata is thin. Score 0.0 for empty results, fabricated-looking content, or an error."
+}

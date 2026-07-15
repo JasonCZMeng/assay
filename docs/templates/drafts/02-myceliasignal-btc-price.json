@@ -1,0 +1,15 @@
+{
+  "method": "GET",
+  "url": "https://api.myceliasignal.com/oracle/price/btc/usd",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["canonical"],
+    "properties": {
+      "canonical": { "type": "string" },
+      "domain": { "type": "string" },
+      "pubkey": { "type": "string" }
+    }
+  },
+  "llmRubric": "The response contains a pipe-delimited canonical attestation string like 'v1|PRICE|BTCUSD|<price>|USD|...' aggregating multiple exchanges. Score 1.0 if it reports a BTC/USD price in a plausible current range (roughly $20,000-$500,000), names multiple real exchanges as sources, and includes a recent unix timestamp. Score 0.5 if the price is present but sources or timestamp look thin or stale. Score 0.0 if there is no parseable price, an error, or placeholder data."
+}

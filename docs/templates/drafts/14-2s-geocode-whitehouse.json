@@ -1,0 +1,7 @@
+{
+  "method": "GET",
+  "url": "https://2s.io/api/geocode/address?q=1600%20Pennsylvania%20Avenue%20NW%2C%20Washington%20DC&limit=1",
+  "headers": {},
+  "responseSchema": { "type": ["object", "array"] },
+  "llmRubric": "The response should geocode '1600 Pennsylvania Avenue NW, Washington DC' (the White House). Score 1.0 if it returns latitude approximately 38.897 and longitude approximately -77.036 (within ~0.02 degrees) with structured address components. Score 0.5 if coordinates are in Washington DC but noticeably off, or address components are missing. Score 0.0 if coordinates are outside the DC area, missing, or the response is an error."
+}

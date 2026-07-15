@@ -1,0 +1,23 @@
+{
+  "method": "GET",
+  "url": "https://proxy.suverse.io/v1/proxy/reskey_1166628d/bazaar-test",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["bitcoin"],
+    "properties": {
+      "bitcoin": {
+        "type": "object",
+        "required": ["usd"],
+        "properties": { "usd": { "type": "number" } }
+      }
+    }
+  },
+  "groundTruth": {
+    "path": "bitcoin.usd",
+    "refSource": "coingecko",
+    "refId": "bitcoin",
+    "refField": "usd",
+    "tolerancePct": 2
+  }
+}

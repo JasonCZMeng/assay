@@ -1,0 +1,22 @@
+{
+  "method": "GET",
+  "url": "https://api.lastlookdata.com/api/crypto/price?coin=BTC",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["symbol", "price_usd"],
+    "properties": {
+      "symbol": { "type": "string" },
+      "price_usd": { "type": "number" },
+      "change_24h_pct": { "type": "number" },
+      "market_cap_usd": { "type": "number" }
+    }
+  },
+  "groundTruth": {
+    "path": "price_usd",
+    "refSource": "coingecko",
+    "refId": "bitcoin",
+    "refField": "usd",
+    "tolerancePct": 2
+  }
+}

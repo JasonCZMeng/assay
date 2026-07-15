@@ -1,0 +1,7 @@
+{
+  "method": "GET",
+  "url": "https://x402.shizu.me/weather?lat=52.52&lon=13.40",
+  "headers": {},
+  "responseSchema": { "type": "object" },
+  "llmRubric": "The response should contain current weather conditions for coordinates 52.52N 13.40E (Berlin, Germany): temperature in Celsius, and some of humidity, wind speed, or a weather code/description. Score 1.0 for a complete, physically plausible current-weather reading (temperature between -25C and 45C). Score 0.5 if only partial data is present. Score 0.0 for implausible values, placeholder data, or an error."
+}

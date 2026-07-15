@@ -1,0 +1,14 @@
+{
+  "method": "GET",
+  "url": "https://api.interzoid.com/translatetoany?text=hello%20world&to=Japanese",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["Translation"],
+    "properties": {
+      "Code": { "type": "string" },
+      "Translation": { "type": "string" }
+    }
+  },
+  "llmRubric": "The response should contain a correct Japanese translation of the English phrase 'hello world' (e.g. こんにちは世界 or a close natural variant in Japanese script). Score 1.0 for a correct Japanese translation. Score 0.5 for a partially correct or romanized translation. Score 0.0 if the translation is missing, in the wrong language, or an error message."
+}
