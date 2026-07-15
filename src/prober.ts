@@ -4,6 +4,7 @@ import { wrapFetchWithPayment, x402Client, decodePaymentResponseHeader } from "@
 import { ExactEvmScheme } from "@x402/evm";
 import { privateKeyToAccount } from "viem/accounts";
 import { config } from "./config.js";
+import { getSetting } from "./db.js";
 import { getTemplates } from "./templates.js";
 import { evalSchema, evalGroundTruth } from "./evaluate.js";
 import { judgeResponse } from "./judge.js";
@@ -106,6 +107,13 @@ export async function runProbes(
 ): Promise<{ probed: number; skipped: string | null }> {
   const now = deps.now ?? Date.now;
   const judge = deps.judge ?? judgeResponse;
+
+  // Kill switch: the dashboard can pause all probing (cron and manual alike). Checked here,
+  // not in the scheduler, so every entry point honors it.
+  if (getSetting(db, "paused") === "1") {
+    console.error("[prober] paused — skipping run");
+    return { probed: 0, skipped: "paused" };
+  }
 
   // Lazily built: only construct the paying fetch once we know at least one probe will run,
   // so a budget that's already exhausted never touches the wallet key.

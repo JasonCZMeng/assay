@@ -6,6 +6,8 @@ import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { config } from "./config.js";
 import { latestScore, tierFor } from "./score.js";
 import { spentTodayUsdc } from "./prober.js";
+import { getSetting, setSetting } from "./db.js";
+import { DASHBOARD_HTML } from "./dashboard.js";
 
 function escapeHtml(s: string): string {
   return s
@@ -16,7 +18,14 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-export function buildApp(db: Database.Database): Hono {
+// Callbacks the long-running process wires in; absent in tests and the API-only surface.
+export type AppOpts = {
+  probeNow?: () => Promise<{ probed: number; skipped: string | null } | null>;
+  ingestNow?: () => Promise<{ upserted: number }>;
+  wallet?: () => Promise<{ address: string; usdc: number }>;
+};
+
+export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
   const app = new Hono();
 
   if (config.paymentsEnabled) {
@@ -91,6 +100,133 @@ export function buildApp(db: Database.Database): Hono {
       .get(Date.now() - 86_400_000) as any).c;
     return c.json({ ok: true, spentToday: spentTodayUsdc(db, Date.now()), services, probes24h });
   });
+
+  // ---- Ops dashboard (read APIs + header-gated controls). The primary protection is the
+  // localhost bind (config.host); the custom-header requirement on POST controls additionally
+  // blocks CSRF and probe-redirect tricks — cross-origin requests can't set custom headers
+  // without a CORS preflight, which this server never grants.
+
+  app.get("/dashboard", (c) => c.html(DASHBOARD_HTML));
+
+  app.get("/api/status", async (c) => {
+    let wallet: { address: string; usdc: number } | null = null;
+    if (opts.wallet) {
+      try {
+        wallet = await opts.wallet();
+      } catch {
+        wallet = null; // RPC hiccup — dashboard shows n/a rather than erroring
+      }
+    }
+    const one = (sql: string, ...args: unknown[]) => (db.prepare(sql).get(...args) as any);
+    return c.json({
+      ok: true,
+      paused: getSetting(db, "paused") === "1",
+      spentToday: spentTodayUsdc(db, Date.now()),
+      dailyBudgetUsdc: config.dailyBudgetUsdc,
+      paymentsEnabled: config.paymentsEnabled,
+      probes24h: one("SELECT COUNT(*) c FROM probes WHERE ts >= ?", Date.now() - 86_400_000).c,
+      probesTotal: one("SELECT COUNT(*) c FROM probes").c,
+      lastProbeTs: one("SELECT MAX(ts) m FROM probes").m,
+      services: {
+        curated: one("SELECT COUNT(*) c FROM services WHERE status='curated'").c,
+        retired: one("SELECT COUNT(*) c FROM services WHERE status='retired'").c,
+        discovered: one("SELECT COUNT(*) c FROM services").c,
+      },
+      wallet,
+      uptimeSec: Math.floor(process.uptime()),
+    });
+  });
+
+  app.get("/api/services", (c) => {
+    const rows = db
+      .prepare(
+        `SELECT s.id, s.domain, s.name, s.price_usdc, s.status,
+                sc.composite, sc.n_probes, sc.trend,
+                p.ts last_ts, p.http_status, p.ok_settlement, p.ok_schema,
+                p.gt_deviation_pct, p.llm_score, p.latency_ms, p.payment_tx, p.error
+         FROM services s
+         LEFT JOIN scores sc ON sc.service_id = s.id
+           AND sc.ts = (SELECT MAX(ts) FROM scores WHERE service_id = s.id)
+         LEFT JOIN probes p ON p.service_id = s.id
+           AND p.id = (SELECT MAX(id) FROM probes WHERE service_id = s.id)
+         WHERE s.status IN ('curated','retired')
+         ORDER BY s.status, s.domain`
+      )
+      .all() as any[];
+    return c.json(
+      rows.map((r) => ({ ...r, tier: r.n_probes != null ? tierFor(r.composite) : "unrated" }))
+    );
+  });
+
+  app.get("/api/probes", (c) => {
+    const limit = Math.min(Math.max(Number(c.req.query("limit")) || 50, 1), 200);
+    const rows = db
+      .prepare(
+        `SELECT p.id, p.service_id, s.domain, p.ts, p.http_status, p.ok_settlement, p.ok_schema,
+                p.gt_deviation_pct, p.llm_score, p.latency_ms, p.usdc_cost, p.payment_tx, p.error
+         FROM probes p JOIN services s ON s.id = p.service_id
+         ORDER BY p.id DESC LIMIT ?`
+      )
+      .all(limit);
+    return c.json(rows);
+  });
+
+  app.get("/api/days", (c) => {
+    const days = Math.min(Math.max(Number(c.req.query("days")) || 14, 1), 90);
+    const rows = db
+      .prepare(
+        `SELECT strftime('%Y-%m-%d', ts/1000, 'unixepoch', 'localtime') day,
+                COUNT(*) probes,
+                SUM(CASE WHEN ok_settlement=1 AND (ok_schema IS NULL OR ok_schema=1) THEN 1 ELSE 0 END) pass,
+                SUM(CASE WHEN ok_settlement=1 AND (ok_schema IS NULL OR ok_schema=1) THEN 0 ELSE 1 END) fail,
+                ROUND(SUM(usdc_cost), 6) usdc
+         FROM probes WHERE ts >= ?
+         GROUP BY day ORDER BY day`
+      )
+      .all(Date.now() - days * 86_400_000);
+    return c.json(rows);
+  });
+
+  app.use("/api/control/*", async (c, next) => {
+    if (c.req.header("x-assay-control") !== "1") {
+      return c.json({ error: "missing control header" }, 403);
+    }
+    await next();
+  });
+
+  app.post("/api/control/pause", (c) => {
+    setSetting(db, "paused", "1");
+    return c.json({ paused: true });
+  });
+
+  app.post("/api/control/resume", (c) => {
+    setSetting(db, "paused", "0");
+    return c.json({ paused: false });
+  });
+
+  app.post("/api/control/probe-now", async (c) => {
+    if (!opts.probeNow) return c.json({ error: "controls not wired in this process" }, 501);
+    if (getSetting(db, "paused") === "1") return c.json({ error: "paused — resume first" }, 409);
+    return c.json({ ok: true, result: await opts.probeNow() });
+  });
+
+  app.post("/api/control/ingest-now", async (c) => {
+    if (!opts.ingestNow) return c.json({ error: "controls not wired in this process" }, 501);
+    return c.json({ ok: true, result: await opts.ingestNow() });
+  });
+
+  const setServiceStatus = (c: any, from: string, to: string) =>
+    c.req.json().then(({ id }: { id?: string }) => {
+      if (!id) return c.json({ error: "missing id" }, 400);
+      const r = db
+        .prepare("UPDATE services SET status=? WHERE id=? AND status=?")
+        .run(to, id, from);
+      if (r.changes === 0) return c.json({ error: `service not found in status '${from}'` }, 404);
+      return c.json({ id, status: to });
+    });
+
+  app.post("/api/control/service/retire", (c) => setServiceStatus(c, "curated", "retired"));
+  app.post("/api/control/service/restore", (c) => setServiceStatus(c, "retired", "curated"));
 
   return app;
 }

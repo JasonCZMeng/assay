@@ -58,7 +58,22 @@ CREATE TABLE IF NOT EXISTS wallets (
   created_at INTEGER NOT NULL,
   retired_at INTEGER
 );
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 `;
+
+export function getSetting(db: Database.Database, key: string): string | null {
+  const r: any = db.prepare("SELECT value FROM settings WHERE key=?").get(key);
+  return r?.value ?? null;
+}
+
+export function setSetting(db: Database.Database, key: string, value: string): void {
+  db.prepare(
+    "INSERT INTO settings (key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value"
+  ).run(key, value);
+}
 
 export function openDb(path?: string): Database.Database {
   const p = path ?? process.env.DB_PATH ?? "data/assay.db";

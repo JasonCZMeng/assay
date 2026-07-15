@@ -22,4 +22,7 @@ export const config = {
   receiveWalletAddress: process.env.RECEIVE_WALLET_ADDRESS ?? "",
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
   port: parseNumericEnv("PORT", 3402),
+  // Bind localhost-only by default: Phase L runs on a home PC and the dashboard exposes
+  // control endpoints. Phase H sets HOST=0.0.0.0 deliberately on the VPS.
+  host: process.env.HOST ?? "127.0.0.1",
 };
