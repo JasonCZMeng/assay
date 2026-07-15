@@ -12,7 +12,9 @@ import { buildApp } from "./server.js";
 
 const db = openDb();
 
-cron.schedule("0 * * * *", () =>
+// Every 6h, not hourly — the full catalog walk is ~260 pages and hourly runs trip CDP's
+// rate limit (observed HTTP 429). Catalog freshness is not probing-critical.
+cron.schedule("0 */6 * * *", () =>
   ingestBazaar(db).then((r) => console.log(`[ingest] upserted ${r.upserted}`))
     .catch((e) => console.error("[ingest]", e))
 );
