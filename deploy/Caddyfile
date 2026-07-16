@@ -1,5 +1,5 @@
-# Replace with your domain. Caddy handles TLS issuance/renewal automatically.
-assay.example.com {
+# Caddy handles TLS issuance/renewal automatically once DNS resolves to this server.
+assay.nominal-labs.com {
 	encode gzip
 	reverse_proxy 127.0.0.1:3402
 }
