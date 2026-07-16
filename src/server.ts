@@ -187,6 +187,21 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
     return c.json(rows);
   });
 
+  app.get("/api/digests", (c) => {
+    const rows = db
+      .prepare("SELECT day, root, n_probes, created_at, anchors FROM digests ORDER BY day DESC")
+      .all() as any[];
+    return c.json(
+      rows.map((r) => ({
+        day: r.day,
+        root: r.root,
+        n_probes: r.n_probes,
+        created_at: r.created_at,
+        anchors: r.anchors ? JSON.parse(r.anchors).map((a: any) => a.calendar) : [],
+      }))
+    );
+  });
+
   app.use("/api/control/*", async (c, next) => {
     if (c.req.header("x-assay-control") !== "1") {
       return c.json({ error: "missing control header" }, 403);

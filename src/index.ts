@@ -8,6 +8,7 @@ import { config } from "./config.js";
 import { ingestBazaar } from "./bazaar.js";
 import { runProbes, BASE_USDC } from "./prober.js";
 import { computeScores } from "./score.js";
+import { anchorMissingDigests } from "./digest.js";
 import { buildApp } from "./server.js";
 
 const db = openDb();
@@ -48,6 +49,18 @@ async function probeAndScore() {
   await sweep("cron");
 }
 for (const c of ["15 6 * * *", "15 13 * * *", "15 21 * * *"]) cron.schedule(c, probeAndScore);
+
+// Digest + OTS-anchor completed days: daily after midnight, and at boot to catch up
+// on days missed while the machine slept.
+const anchor = () =>
+  anchorMissingDigests(db)
+    .then((r) => {
+      if (r.digested.length || r.anchored.length)
+        console.log(`[digest] digested=[${r.digested}] anchored=[${r.anchored}]`);
+    })
+    .catch((e) => console.error("[digest]", e));
+cron.schedule("10 0 * * *", anchor);
+setTimeout(anchor, 30_000);
 
 // On-chain wallet snapshot for the dashboard, cached so polling stays off the RPC.
 const rpc = createPublicClient({ chain: base, transport: viemHttp("https://mainnet.base.org") });

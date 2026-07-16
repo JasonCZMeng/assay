@@ -62,6 +62,13 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS digests (
+  day TEXT PRIMARY KEY,            -- local calendar day YYYY-MM-DD
+  root TEXT NOT NULL,              -- merkle root (hex) over the day's probe rows
+  n_probes INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  anchors TEXT                     -- JSON [{calendar, proof_b64, at}] or NULL until anchored
+);
 `;
 
 export function getSetting(db: Database.Database, key: string): string | null {

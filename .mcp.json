@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "assay": {
+      "command": "npx",
+      "args": ["tsx", "mcp/server.mts"],
+      "env": { "ASSAY_URL": "http://127.0.0.1:3402" }
+    }
+  }
+}
