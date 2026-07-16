@@ -3,7 +3,7 @@ import cron from "node-cron";
 import { createPublicClient, http as viemHttp, erc20Abi } from "viem";
 import { base } from "viem/chains";
 import { privateKeyToAccount } from "viem/accounts";
-import { openDb } from "./db.js";
+import { openDb, getSetting } from "./db.js";
 import { config } from "./config.js";
 import { ingestBazaar } from "./bazaar.js";
 import { runProbes, BASE_USDC } from "./prober.js";
@@ -50,8 +50,9 @@ async function probeAndScore() {
 }
 for (const c of ["15 6 * * *", "15 13 * * *", "15 21 * * *"]) cron.schedule(c, probeAndScore);
 
-// Digest + OTS-anchor completed days: daily after midnight, and at boot to catch up
-// on days missed while the machine slept.
+// Digest + OTS-anchor completed days. Hourly rather than once-nightly because node-cron
+// does NOT backfill executions missed while the machine sleeps — the job is idempotent
+// and a no-op when there's nothing to do, so hourly costs nothing and self-heals wake gaps.
 const anchor = () =>
   anchorMissingDigests(db)
     .then((r) => {
@@ -59,8 +60,17 @@ const anchor = () =>
         console.log(`[digest] digested=[${r.digested}] anchored=[${r.anchored}]`);
     })
     .catch((e) => console.error("[digest]", e));
-cron.schedule("10 0 * * *", anchor);
+cron.schedule("10 * * * *", anchor);
 setTimeout(anchor, 30_000);
+
+// Sweep catch-up, same reason: if the machine slept through scheduled sweeps, restore the
+// 3/day cadence once awake. 10.5h exceeds the largest legitimate gap between sweeps
+// (21:15→06:15 plus up to 1h jitter), so this never double-fires on a healthy schedule.
+setInterval(() => {
+  if (getSetting(db, "paused") === "1") return;
+  const last = ((db.prepare("SELECT MAX(ts) m FROM probes").get() as any)?.m ?? 0) as number;
+  if (Date.now() - last > 10.5 * 3600_000) void sweep("catchup");
+}, 15 * 60_000);
 
 // On-chain wallet snapshot for the dashboard, cached so polling stays off the RPC.
 const rpc = createPublicClient({ chain: base, transport: viemHttp("https://mainnet.base.org") });
