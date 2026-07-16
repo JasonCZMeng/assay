@@ -135,6 +135,16 @@ describe("control endpoints", () => {
     expect(await res.text()).toContain("Assay · Ops");
   });
 
+  it("landing page is served at root", async () => {
+    const db = openDb(":memory:");
+    const res = await buildApp(db).request("/");
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("ASSAY");
+    expect(html).toContain("/leaderboard");
+    expect(res.headers.get("cache-control")).toContain("max-age=300");
+  });
+
   it("honors a custom control token", async () => {
     const db = openDb(":memory:");
     const app = buildApp(db, { controlToken: "s3cret" });

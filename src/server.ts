@@ -10,6 +10,7 @@ import { latestScore, tierFor } from "./score.js";
 import { spentTodayUsdc } from "./prober.js";
 import { getSetting, setSetting } from "./db.js";
 import { DASHBOARD_HTML } from "./dashboard.js";
+import { LANDING_HTML } from "./landing.js";
 
 function escapeHtml(s: string): string {
   return s
@@ -97,6 +98,11 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
       )
     );
   }
+
+  app.get("/", (c) => {
+    c.header("Cache-Control", "public, max-age=300");
+    return c.html(LANDING_HTML);
+  });
 
   app.get("/tier/:id", (c) => {
     const id = c.req.param("id");
