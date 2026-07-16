@@ -11,6 +11,9 @@ ExecStart=/usr/local/bin/npx tsx src/index.ts
 Restart=always
 RestartSec=15
 EnvironmentFile=/opt/assay/app/.env
+# Force outbound over IPv4 so egress matches the CDP API key's IP allowlist (the box
+# defaults to IPv6, which the allowlist doesn't cover). Also keeps all outbound consistent.
+Environment=NODE_OPTIONS=--dns-result-order=ipv4first --no-network-family-autoselection
 # Hygiene: the process holds a funded key; keep the blast radius small.
 NoNewPrivileges=true
 ProtectSystem=strict
