@@ -98,7 +98,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   <div class="card">
     <h2>Recent probes</h2>
     <div style="overflow-x:auto"><table id="probes"></table></div>
-    <div class="foot">Sweeps run at 06:15 · 13:15 · 21:15 (+ up to 1h anti-fingerprint jitter). Auto-refresh every 15s.</div>
+    <div class="foot">Sweeps run every 4h at :15 (+ up to 1h anti-fingerprint jitter). Auto-refresh every 15s.</div>
   </div>
 </div>
 

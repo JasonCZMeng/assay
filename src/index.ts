@@ -48,7 +48,10 @@ async function probeAndScore() {
   await new Promise((r) => setTimeout(r, jitterMs));
   await sweep("cron");
 }
-for (const c of ["15 6 * * *", "15 13 * * *", "15 21 * * *"]) cron.schedule(c, probeAndScore);
+// Every 4h (6 sweeps/day, ~$0.52/day at current curation): scores unlock after ~3.3 days
+// while still sampling across days and times of day. Kept permanently so newly curated
+// services rate in days, not a week.
+cron.schedule("15 */4 * * *", probeAndScore);
 
 // Digest + OTS-anchor completed days. Hourly rather than once-nightly because node-cron
 // does NOT backfill executions missed while the machine sleeps — the job is idempotent
@@ -64,12 +67,12 @@ cron.schedule("10 * * * *", anchor);
 setTimeout(anchor, 30_000);
 
 // Sweep catch-up, same reason: if the machine slept through scheduled sweeps, restore the
-// 3/day cadence once awake. 10.5h exceeds the largest legitimate gap between sweeps
-// (21:15→06:15 plus up to 1h jitter), so this never double-fires on a healthy schedule.
+// cadence once awake. 5.5h exceeds the largest legitimate gap between sweeps (4h schedule
+// plus up to 1h jitter), so this never double-fires on a healthy schedule.
 setInterval(() => {
   if (getSetting(db, "paused") === "1") return;
   const last = ((db.prepare("SELECT MAX(ts) m FROM probes").get() as any)?.m ?? 0) as number;
-  if (Date.now() - last > 10.5 * 3600_000) void sweep("catchup");
+  if (Date.now() - last > 5.5 * 3600_000) void sweep("catchup");
 }, 15 * 60_000);
 
 // On-chain wallet snapshot for the dashboard, cached so polling stays off the RPC.
