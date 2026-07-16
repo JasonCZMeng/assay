@@ -3,6 +3,7 @@ import { getConnInfo } from "@hono/node-server/conninfo";
 import type Database from "better-sqlite3";
 import { paymentMiddleware, x402ResourceServer } from "@x402/hono";
 import { HTTPFacilitatorClient } from "@x402/core/server";
+import { createFacilitatorConfig } from "@coinbase/x402";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { config } from "./config.js";
 import { latestScore, tierFor } from "./score.js";
@@ -70,7 +71,12 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
     // schemes registered), not a bare `{ address }` config, and `network` is a CAIP-2 chain id
     // (`eip155:8453` for Base mainnet), not the literal string "base". Built lazily here, inside
     // the flag branch, since this only ever runs when paymentsEnabled=true.
-    const facilitatorClient = new HTTPFacilitatorClient({ url: config.facilitatorUrl });
+    // CDP facilitator (Base mainnet settlement + Bazaar listing eligibility) when keys are
+    // present; otherwise the plain facilitator URL (testnet default — see config).
+    const facilitatorClient =
+      config.cdpApiKeyId && config.cdpApiKeySecret
+        ? new HTTPFacilitatorClient(createFacilitatorConfig(config.cdpApiKeyId, config.cdpApiKeySecret))
+        : new HTTPFacilitatorClient({ url: config.facilitatorUrl });
     const resourceServer = new x402ResourceServer(facilitatorClient).register(
       "eip155:8453",
       new ExactEvmScheme()

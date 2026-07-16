@@ -39,4 +39,7 @@ export const config = {
   // The default is the official free facilitator — TESTNET ONLY (no eip155:8453 kinds).
   // Base mainnet settlement requires the CDP facilitator + CDP API key at the revenue flip.
   facilitatorUrl: process.env.FACILITATOR_URL ?? "https://x402.org/facilitator",
+  // When both are set, the CDP facilitator (Base mainnet) is used instead of facilitatorUrl.
+  cdpApiKeyId: process.env.CDP_API_KEY_ID ?? "",
+  cdpApiKeySecret: process.env.CDP_API_KEY_SECRET ?? "",
 };
