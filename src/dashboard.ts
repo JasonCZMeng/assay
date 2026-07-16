@@ -130,12 +130,19 @@ export const DASHBOARD_HTML = `<!doctype html>
       esc(tx.slice(0, 10)) + '…</a>';
   }
   function getJSON(url) { return fetch(url).then(function (r) { return r.json(); }); }
-  function ctl(path, body) {
+  function ctl(path, body, retried) {
     return fetch('/api/control/' + path, {
       method: 'POST',
-      headers: { 'x-assay-control': '1', 'content-type': 'application/json' },
+      headers: {
+        'x-assay-control': localStorage.getItem('assayControlToken') || '1',
+        'content-type': 'application/json'
+      },
       body: body ? JSON.stringify(body) : undefined
     }).then(function (r) {
+      if (r.status === 403 && !retried) {
+        var t = prompt('Control token required (the server\\'s CONTROL_TOKEN):');
+        if (t) { localStorage.setItem('assayControlToken', t); return ctl(path, body, true); }
+      }
       return r.json().then(function (j) {
         if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
         return j;

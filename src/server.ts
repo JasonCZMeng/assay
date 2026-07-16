@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { getConnInfo } from "@hono/node-server/conninfo";
 import type Database from "better-sqlite3";
 import { paymentMiddleware, x402ResourceServer } from "@x402/hono";
 import { HTTPFacilitatorClient } from "@x402/core/server";
@@ -23,10 +24,44 @@ export type AppOpts = {
   probeNow?: () => Promise<{ probed: number; skipped: string | null } | null>;
   ingestNow?: () => Promise<{ upserted: number }>;
   wallet?: () => Promise<{ address: string; usdc: number }>;
+  // Test overrides; production values come from config.
+  rateLimitRpm?: number;
+  controlToken?: string;
 };
 
 export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
   const app = new Hono();
+  const rateLimitRpm = opts.rateLimitRpm ?? config.rateLimitRpm;
+  const controlToken = opts.controlToken ?? config.controlToken;
+
+  // Fixed-window per-IP rate limit for public exposure. In-memory is deliberate: one
+  // process owns the port, and losing counters on restart is harmless.
+  if (rateLimitRpm > 0) {
+    const windows = new Map<string, { count: number; resetAt: number }>();
+    app.use(async (c, next) => {
+      const xff = config.trustProxy ? c.req.header("x-forwarded-for")?.split(",")[0]?.trim() : undefined;
+      let ip = xff;
+      if (!ip) {
+        try {
+          ip = getConnInfo(c).remote.address ?? "unknown";
+        } catch {
+          ip = "unknown"; // no socket in test harness
+        }
+      }
+      const now = Date.now();
+      let w = windows.get(ip);
+      if (!w || now >= w.resetAt) {
+        w = { count: 0, resetAt: now + 60_000 };
+        windows.set(ip, w);
+        if (windows.size > 50_000) windows.clear(); // memory backstop under address-spoof flood
+      }
+      if (++w.count > rateLimitRpm) {
+        c.header("Retry-After", String(Math.ceil((w.resetAt - now) / 1000)));
+        return c.json({ error: "rate limited" }, 429);
+      }
+      await next();
+    });
+  }
 
   if (config.paymentsEnabled) {
     // Real @x402/hono v2 API (confirmed against node_modules/@x402/hono/README.md and the
@@ -35,7 +70,7 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
     // schemes registered), not a bare `{ address }` config, and `network` is a CAIP-2 chain id
     // (`eip155:8453` for Base mainnet), not the literal string "base". Built lazily here, inside
     // the flag branch, since this only ever runs when paymentsEnabled=true.
-    const facilitatorClient = new HTTPFacilitatorClient({ url: "https://facilitator.x402.org" });
+    const facilitatorClient = new HTTPFacilitatorClient({ url: config.facilitatorUrl });
     const resourceServer = new x402ResourceServer(facilitatorClient).register(
       "eip155:8453",
       new ExactEvmScheme()
@@ -203,8 +238,8 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
   });
 
   app.use("/api/control/*", async (c, next) => {
-    if (c.req.header("x-assay-control") !== "1") {
-      return c.json({ error: "missing control header" }, 403);
+    if (c.req.header("x-assay-control") !== controlToken) {
+      return c.json({ error: "missing or wrong control header" }, 403);
     }
     await next();
   });

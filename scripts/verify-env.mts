@@ -35,4 +35,16 @@ console.log(Number.isFinite(budget) && budget > 0
 console.log(`✓ PAYMENTS_ENABLED = ${process.env.PAYMENTS_ENABLED === "true"} (should be false for Phase L)`);
 console.log(`✓ PORT = ${process.env.PORT ?? "3402 (default)"}`);
 
+if (process.env.PAYMENTS_ENABLED === "true" && !process.env.RECEIVE_WALLET_ADDRESS) {
+  fail("PAYMENTS_ENABLED=true requires RECEIVE_WALLET_ADDRESS");
+}
+const host = process.env.HOST ?? "127.0.0.1";
+const publicHost = host !== "127.0.0.1" && host !== "localhost";
+if (publicHost && (process.env.CONTROL_TOKEN ?? "1") === "1") {
+  fail(`HOST=${host} is publicly bound but CONTROL_TOKEN is the localhost default — set a strong secret`);
+}
+if (publicHost && Number(process.env.RATE_LIMIT_RPM ?? "120") === 0) {
+  fail(`HOST=${host} is publicly bound with rate limiting disabled`);
+}
+
 process.exit(ok ? 0 : 1);

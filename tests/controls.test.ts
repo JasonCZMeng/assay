@@ -134,4 +134,40 @@ describe("control endpoints", () => {
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("Assay · Ops");
   });
+
+  it("honors a custom control token", async () => {
+    const db = openDb(":memory:");
+    const app = buildApp(db, { controlToken: "s3cret" });
+    let res = await app.request("/api/control/pause", {
+      method: "POST",
+      headers: { "x-assay-control": "1" },
+    });
+    expect(res.status).toBe(403);
+    res = await app.request("/api/control/pause", {
+      method: "POST",
+      headers: { "x-assay-control": "s3cret" },
+    });
+    expect(res.status).toBe(200);
+  });
+});
+
+describe("rate limiting", () => {
+  it("returns 429 with Retry-After once the per-IP window is exhausted", async () => {
+    const db = openDb(":memory:");
+    const app = buildApp(db, { rateLimitRpm: 3 });
+    for (let i = 0; i < 3; i++) {
+      expect((await app.request("/healthz")).status).toBe(200);
+    }
+    const res = await app.request("/healthz");
+    expect(res.status).toBe(429);
+    expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
+  });
+
+  it("is disabled when rpm is 0", async () => {
+    const db = openDb(":memory:");
+    const app = buildApp(db, { rateLimitRpm: 0 });
+    for (let i = 0; i < 10; i++) {
+      expect((await app.request("/healthz")).status).toBe(200);
+    }
+  });
 });

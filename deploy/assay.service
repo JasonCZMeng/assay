@@ -1,0 +1,22 @@
+[Unit]
+Description=Assay x402 quality prober + API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=assay
+WorkingDirectory=/opt/assay/app
+ExecStart=/usr/bin/npx tsx src/index.ts
+Restart=always
+RestartSec=15
+EnvironmentFile=/opt/assay/app/.env
+# Hygiene: the process holds a funded key; keep the blast radius small.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/assay/app/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
