@@ -54,7 +54,7 @@ export const LANDING_HTML = `<!doctype html>
   nav .links a:hover { color:var(--gold-hot); }
 
   /* ---------- HERO: certificate head ---------- */
-  .hero { position:relative; padding:7vh 0 9vh; }
+  .hero { position:relative; padding:7vh 0 9vh; overflow-x:clip; }
   .hero .au-mark { position:absolute; right:-2%; top:2%; font-family:"Bodoni Moda",serif; font-weight:700;
     font-size:clamp(180px,30vw,420px); line-height:.8; color:transparent; -webkit-text-stroke:1px var(--line);
     user-select:none; pointer-events:none; z-index:0; }
