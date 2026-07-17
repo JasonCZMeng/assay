@@ -67,7 +67,7 @@ export const LANDING_HTML = `<!doctype html>
   /* the morphing word */
   .word-stage { position:relative; z-index:2; margin-top:5vh; height:clamp(120px,21vw,260px); }
   .word-stage .v { position:absolute; left:0; bottom:0; line-height:.86; white-space:nowrap;
-    opacity:0; visibility:hidden; will-change:opacity,transform; }
+    opacity:0; visibility:hidden; will-change:opacity,transform; transition:opacity .22s ease; }
   .word-stage .v.on { opacity:1; visibility:visible; }
   .word-stage .v.echo { opacity:.13; visibility:visible; }
   .word-stage .v.echo2 { opacity:.06; visibility:visible; }
@@ -376,13 +376,13 @@ export const LANDING_HTML = `<!doctype html>
       if (oi >= order.length) reshuffle();
       paint(false);
       if (framesLeft > 0) {
-        setTimeout(function () { step(framesLeft - 1); }, 80 + Math.random() * 90);
+        setTimeout(function () { step(framesLeft - 1); }, 340 + Math.random() * 280);
       } else {
         paint(true);
-        setTimeout(function () { step(16 + Math.floor(Math.random() * 10)); }, 2100);
+        setTimeout(function () { step(10 + Math.floor(Math.random() * 6)); }, 3400);
       }
     }
-    step(18);
+    step(12);
   } else if (stage) {
     els[0].className += ' final';
   }
