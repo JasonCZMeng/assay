@@ -49,13 +49,26 @@ export function wrapFetchWithAssay(
   opts: AssayGuardOptions = {}
 ): typeof fetch {
   const assayUrl = (opts.assayUrl ?? "https://assay.nominal-labs.com").replace(/\/$/, "");
+  // Compare by parsed origin, never string prefix: a host like `assay.nominal-labs.com.evil.com`
+  // starts with the Assay URL string and would otherwise be waved through the guard unchecked.
+  const assayOrigin = new URL(assayUrl).origin;
   const minTier = opts.minTier ?? "ok";
   const onUnrated = opts.onUnrated ?? "allow";
   const onUnknown = opts.onUnknown ?? "allow";
   const ttl = opts.cacheTtlMs ?? 3_600_000;
   const failOpen = opts.failOpen ?? true;
   const lookupFetch = opts.lookupFetch ?? fetch;
+  // Bounded: query-string-varying URLs would otherwise grow this map without limit in a
+  // long-running agent. Map preserves insertion order, so deleting the first key is FIFO eviction.
+  const CACHE_MAX = 5_000;
   const cache = new Map<string, { tier: AssayTier | "unknown" | "error"; at: number }>();
+  function cacheSet(url: string, entry: { tier: AssayTier | "unknown" | "error"; at: number }) {
+    if (cache.size >= CACHE_MAX) {
+      const oldest = cache.keys().next().value;
+      if (oldest !== undefined) cache.delete(oldest);
+    }
+    cache.set(url, entry);
+  }
 
   async function tierOf(url: string): Promise<AssayTier | "unknown" | "error"> {
     const hit = cache.get(url);
@@ -71,14 +84,20 @@ export function wrapFetchWithAssay(
     } catch {
       tier = "error";
     }
-    cache.set(url, { tier, at: Date.now() });
+    cacheSet(url, { tier, at: Date.now() });
     return tier;
   }
 
   const wrapped = async (input: any, init?: any): Promise<Response> => {
     const url =
       typeof input === "string" ? input : input instanceof URL ? input.href : input?.url;
-    if (typeof url === "string" && /^https?:\/\//.test(url) && !url.startsWith(assayUrl)) {
+    let isAssayOrigin = false;
+    try {
+      isAssayOrigin = typeof url === "string" && new URL(url).origin === assayOrigin;
+    } catch {
+      /* unparseable URL — not our origin, fall through to guard */
+    }
+    if (typeof url === "string" && /^https?:\/\//.test(url) && !isAssayOrigin) {
       const tier = await tierOf(url);
       if (tier === "error") {
         if (!failOpen) throw new AssayBlockedError(url, "unknown");

@@ -43,6 +43,10 @@ CREATE TABLE IF NOT EXISTS probes (
   error TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_probes_service_ts ON probes(service_id, ts);
+-- Ts-only index for the many global time-window queries (budget/24h counts, MIN/MAX(ts),
+-- day-range digests). The composite index above is service-leading and SQLite can't skip-scan
+-- it for these, so without this every such query full-scans the append-only probes table.
+CREATE INDEX IF NOT EXISTS idx_probes_ts ON probes(ts);
 CREATE TABLE IF NOT EXISTS scores (
   service_id TEXT NOT NULL REFERENCES services(id),
   ts INTEGER NOT NULL,

@@ -402,7 +402,7 @@ export const LANDING_HTML = `<!doctype html>
       return '<span>' + (ok ? '<span class="ok">&#10003;</span>' : '<span class="bad">&#10007;</span>') + ' ' +
         String(p.domain || '').replace(/[<>&]/g, '') +
         ' &middot; $' + p.usdc_cost + ' &middot; ' + (p.latency_ms || '?') + 'ms' +
-        (p.payment_tx ? ' &middot; tx ' + String(p.payment_tx).slice(0, 10) + '&hellip;' : '') + '</span>';
+        (p.payment_tx ? ' &middot; tx ' + String(p.payment_tx).replace(/[<>&"]/g, '').slice(0, 10) + '&hellip;' : '') + '</span>';
     });
     if (bits.length) {
       var half = bits.join('<span style="opacity:.3">&#8213;</span>');

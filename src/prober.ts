@@ -49,11 +49,13 @@ export function paymentAllowed(req: {
     };
   }
 
-  // Check amount is within cap
-  if (!withinCap(req.amount ?? 0)) {
+  // Amount must be present AND within cap. Fail CLOSED on a missing amount: treating an absent
+  // amount as 0 (the old `req.amount ?? 0`) let a requirement with no stated amount slip past
+  // the hard-cap check, which is precisely the input we must not authorize blindly.
+  if (req.amount == null || !withinCap(req.amount)) {
     return {
       ok: false,
-      reason: `payment amount ${req.amount} exceeds hard cap ${HARD_CAP_USDC_UNITS}`,
+      reason: `payment amount ${req.amount} is missing or exceeds hard cap ${HARD_CAP_USDC_UNITS}`,
     };
   }
 
@@ -65,7 +67,9 @@ export function paymentAllowed(req: {
 // (confirmed against node_modules/@x402/fetch/README.md — the brief's `wrapFetchWithPayment(fetch,
 // account)` shape does not exist). `ExactEvmScheme` lives in `@x402/evm`, which was not yet a
 // project dependency; added it at ^2.17.0 to match the other @x402/* packages.
-export function makePayFetch(): typeof fetch {
+// `onPay`, when supplied, is invoked with the exact atomic-USDC amount authorized for each
+// payment — the source of truth for budget accounting (the `exact` scheme settles exactly this).
+export function makePayFetch(onPay?: (amountUnits: bigint) => void): typeof fetch {
   let account;
   try {
     account = privateKeyToAccount(config.probeWalletKey as `0x${string}`);
@@ -90,12 +94,23 @@ export function makePayFetch(): typeof fetch {
           reason: check.reason,
         };
       }
+      // Payment is about to be created — capture the authorized amount for real-spend accounting.
+      if (onPay && selectedRequirements?.amount != null) {
+        try {
+          onPay(BigInt(selectedRequirements.amount));
+        } catch {
+          /* unparsable amount — leave unrecorded rather than crash the sweep */
+        }
+      }
     });
   return wrapFetchWithPayment(fetch, client);
 }
 
 type Deps = {
   payFetch?: typeof fetch;
+  // Factory seam: receives the onPay callback so a test can drive the paid-amount accounting
+  // without a wallet or network. Ignored when payFetch is supplied.
+  makePayFetch?: (onPay?: (amountUnits: bigint) => void) => typeof fetch;
   refFetch?: typeof fetch;
   judge?: typeof judgeResponse;
   now?: () => number;
@@ -118,6 +133,9 @@ export async function runProbes(
   // Lazily built: only construct the paying fetch once we know at least one probe will run,
   // so a budget that's already exhausted never touches the wallet key.
   let payFetch = deps.payFetch;
+  // Set by makePayFetch's onPay hook to the atomic-USDC amount authorized for the current probe.
+  // Reset to null before each probe; a null after the fetch means no payment was made.
+  let paidUnits: bigint | null = null;
 
   const insert = db.prepare(`
     INSERT INTO probes (service_id, ts, ok_settlement, ok_schema, gt_deviation_pct, llm_score,
@@ -128,16 +146,19 @@ export async function runProbes(
   let probed = 0;
   for (const t of getTemplates(db)) {
     // Re-check before every probe (not just once at the top of the run): a long run can cross
-    // the daily budget mid-loop as earlier probes' costs land, and we must stop immediately
-    // rather than keep paying past the cap.
+    // the daily budget mid-loop as earlier probes' costs land, or an operator can pause the
+    // sweep from the dashboard — either must stop us immediately rather than keep paying.
+    if (getSetting(db, "paused") === "1") {
+      console.error(`[prober] paused mid-run — halting`);
+      return { probed, skipped: "paused" };
+    }
     if (spentTodayUsdc(db, now()) >= config.dailyBudgetUsdc) {
       console.error(`[prober] daily budget reached — halting`);
       return { probed, skipped: "budget" };
     }
-    if (!payFetch) payFetch = makePayFetch();
+    if (!payFetch) payFetch = (deps.makePayFetch ?? makePayFetch)((amt) => (paidUnits = amt));
 
-    const price: any = db.prepare("SELECT price_usdc FROM services WHERE id=?").get(t.serviceId);
-    const cost = price?.price_usdc ?? 0;
+    paidUnits = null; // cleared each probe; the pay hook sets it only if a payment is authorized
     const started = now();
     let status: number | null = null;
     let body = "";
@@ -195,9 +216,12 @@ export async function runProbes(
       if (t.llmRubric) llm = await judge(body.slice(0, 2000), t.llmRubric);
     }
 
+    // Record the amount ACTUALLY authorized this probe (0 if no payment was made), not the
+    // Bazaar catalog price — the budget guard sums this column, so it must reflect real spend.
+    const cost = paidUnits != null ? Number(paidUnits) / 1e6 : 0;
     insert.run(
       t.serviceId, started, okSettlement, okSchema, gtDev, llm, status, latency,
-      cost, // payment may settle even on failure — record the price regardless of outcome
+      cost,
       paymentTx,
       createHash("sha256").update(body).digest("hex"), body.slice(0, 2000), error
     );

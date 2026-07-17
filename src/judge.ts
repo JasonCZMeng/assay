@@ -8,7 +8,10 @@ export async function judgeResponse(
   rubric: string,
   client?: Anthropic
 ): Promise<number | null> {
-  const c = client ?? (defaultClient ??= new Anthropic({ apiKey: config.anthropicApiKey }));
+  // Bound the judge's cost to the sweep: the SDK defaults to a 10-minute timeout and 2 retries
+  // (worst case ~30 min of stall per rubric probe). One judged probe is not worth that — cap it.
+  const c =
+    client ?? (defaultClient ??= new Anthropic({ apiKey: config.anthropicApiKey, timeout: 20_000, maxRetries: 1 }));
   try {
     const msg = await c.messages.create({
       model: "claude-haiku-4-5-20251001",

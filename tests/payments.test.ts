@@ -68,6 +68,9 @@ describe("payments enabled (Phase H)", () => {
     const accepts = JSON.stringify(challenge);
     expect(accepts).toContain("eip155:8453");
     expect(accepts).toContain(RECEIVE);
+    // Pin the PRICE: $0.005 = 5000 atomic USDC units. Without this, an accidental change to the
+    // configured /score price passes every other assertion in this file silently.
+    expect(accepts).toContain("5000");
   });
 
   it("keeps /tier, /leaderboard and /healthz free while /score is gated", async () => {
