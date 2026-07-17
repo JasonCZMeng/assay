@@ -1,11 +1,11 @@
 // Assay MCP server — lets any MCP-capable agent (Claude Code, Claude Desktop, etc.) check
 // x402 service quality before paying. Run: npx tsx mcp/server.mts
-// Config: ASSAY_URL (default http://127.0.0.1:3402; Phase H sets the public domain).
+// Config: ASSAY_URL (default https://assay.nominal-labs.com; Phase H sets the public domain).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-const ASSAY_URL = process.env.ASSAY_URL ?? "http://127.0.0.1:3402";
+const ASSAY_URL = process.env.ASSAY_URL ?? "https://assay.nominal-labs.com";
 
 async function api(path: string): Promise<{ status: number; json: any }> {
   const res = await fetch(`${ASSAY_URL}${path}`, { signal: AbortSignal.timeout(10_000) });

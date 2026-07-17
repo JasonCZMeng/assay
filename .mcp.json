@@ -3,7 +3,7 @@
     "assay": {
       "command": "npx",
       "args": ["tsx", "mcp/server.mts"],
-      "env": { "ASSAY_URL": "http://127.0.0.1:3402" }
+      "env": { "ASSAY_URL": "https://assay.nominal-labs.com" }
     }
   }
 }

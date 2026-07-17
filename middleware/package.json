@@ -1,0 +1,11 @@
+{
+  "name": "assay-x402-guard",
+  "version": "0.1.0",
+  "description": "Pre-payment quality guard for x402 agents — blocks spend to services Assay rates 'avoid', backed by real paid probes with on-chain receipts.",
+  "type": "module",
+  "main": "index.ts",
+  "keywords": ["x402", "assay", "agents", "payments", "trust", "quality", "base"],
+  "homepage": "https://assay.nominal-labs.com",
+  "license": "MIT",
+  "private": true
+}
