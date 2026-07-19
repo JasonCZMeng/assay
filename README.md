@@ -140,5 +140,6 @@ for Base mainnet when both are set).
 
 ## License
 
-The npm packages ([`mcp/`](mcp/) and [`middleware/`](middleware/)) are MIT-licensed.
-The oracle service code is currently source-available without an explicit license grant.
+[MIT](LICENSE) — the whole repo, including the npm packages ([`mcp/`](mcp/) and
+[`middleware/`](middleware/)). The code is freely reusable; the evidence corpus and its
+Bitcoin-anchored history are what a fresh deployment can't copy.
