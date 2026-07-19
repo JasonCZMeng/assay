@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.JasonCZMeng/assay",
-  "description": "MCP server for Assay, the x402 service-quality oracle — check any machine-payable service's quality tier and score (earned by real paid probes with on-chain receipts) before your agent pays it.",
+  "description": "x402 service-quality oracle: check a service's paid-probe quality tier and score before paying it.",
   "repository": {
     "url": "https://github.com/JasonCZMeng/assay",
     "source": "github"
