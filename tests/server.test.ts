@@ -56,6 +56,20 @@ describe("server", () => {
     }
   });
 
+  it("serves the brand icon as PNG and SVG", async () => {
+    const db = openDb(":memory:");
+    const app = buildApp(db);
+    const png = await app.request("/icon.png");
+    expect(png.status).toBe(200);
+    expect(png.headers.get("content-type")).toBe("image/png");
+    const bytes = new Uint8Array(await png.arrayBuffer());
+    expect([...bytes.slice(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]); // PNG magic
+    const svg = await app.request("/icon.svg");
+    expect(svg.status).toBe(200);
+    expect(svg.headers.get("content-type")).toBe("image/svg+xml");
+    expect(await svg.text()).toContain("<svg");
+  });
+
   it("healthz reports counts", async () => {
     const db = openDb(":memory:");
     seed(db);

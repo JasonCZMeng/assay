@@ -13,6 +13,7 @@ import { getSetting, setSetting } from "./db.js";
 import { DASHBOARD_HTML } from "./dashboard.js";
 import { LANDING_HTML } from "./landing.js";
 import { SKILL_MD } from "./skill.js";
+import { ICON_PNG, ICON_SVG } from "./icon.js";
 
 function escapeHtml(s: string): string {
   return s
@@ -111,6 +112,9 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
               "https://assay.nominal-labs.com/SKILL.md",
             mimeType: "application/json",
             tags: ["trust", "reputation", "quality", "score", "oracle", "verification", "ratings", "data"],
+            // PNG, not SVG: CDP re-hosts icons through an image pipeline (observed
+            // cloudinary), and raster is the safe common denominator.
+            iconUrl: `${config.publicUrl}/icon.png`,
             // NB: no `method` field — DeclareDiscoveryExtensionInput omits it; the middleware
             // infers it from the route key ("GET /score/*").
             extensions: declareDiscoveryExtension({
@@ -158,6 +162,15 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
     });
   app.get("/SKILL.md", serveSkill);
   app.get("/skill.md", serveSkill);
+
+  // Brand icon (see icon.ts): PNG is what the Bazaar iconUrl points at, SVG is the crisp
+  // favicon source. Cache hard — the asset only changes with a deploy.
+  app.get("/icon.png", (c) =>
+    c.body(ICON_PNG, 200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" })
+  );
+  app.get("/icon.svg", (c) =>
+    c.body(ICON_SVG, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" })
+  );
 
   app.get("/tier/:id", (c) => {
     const id = c.req.param("id");

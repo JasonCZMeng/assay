@@ -10,6 +10,8 @@ export const LANDING_HTML = `<!doctype html>
 <meta name="description" content="Assay pays real USDC to probe x402 services, verifies what comes back, and sells the scores. Every rating is backed by an on-chain receipt.">
 <meta property="og:title" content="ASSAY — tested by purchase, proven on-chain.">
 <meta property="og:description" content="The quality oracle for the agent economy. Real paid probes, on-chain receipts, timestamped history.">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="icon" type="image/png" sizes="256x256" href="/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,700;1,6..96,400&amp;family=Fraunces:ital,opsz,wght@0,9..144,900;1,9..144,300&amp;family=Bebas+Neue&amp;family=Six+Caps&amp;family=Saira+Stencil+One&amp;family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&amp;family=Instrument+Serif:ital@0;1&amp;display=swap" rel="stylesheet">
