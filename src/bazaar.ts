@@ -28,35 +28,40 @@ export async function ingestBazaar(
     const data: any = await res.json();
     const items: any[] = data.items ?? [];
     const now = Date.now();
-    for (const it of items) {
-      // A single malformed item (bad resource URL, etc.) must not abort the whole ingest run —
-      // skip it, count it, and keep going.
-      try {
-        const url: string = it.resource;
-        if (!url?.startsWith("http")) continue;
-        const accept = it.accepts?.[0] ?? {};
-        // Real Bazaar shape: serviceName, tags[], accepts[{amount, network, asset}]
-        // Fallback: metadata.name, metadata.category, accepts[{maxAmountRequired}]
-        const name = it.serviceName ?? it.metadata?.name ?? null;
-        const tags = Array.isArray(it.tags) ? it.tags : [];
-        const category = tags.length > 0 ? tags[0] : (it.metadata?.category ?? null);
-        const amount = accept.amount ?? accept.maxAmountRequired;
-        const price_usdc = amount ? Number(amount) / 1e6 : null;
-        upsert.run({
-          id: url,
-          domain: new URL(url).hostname,
-          name,
-          category,
-          price_usdc,
-          network: accept.network ?? null,
-          now,
-          raw: JSON.stringify(it),
-        });
-        upserted++;
-      } catch {
-        malformed++;
+    // One transaction per page: ~26k individual auto-committed upserts per full walk is fsync
+    // torture for zero benefit; a page is a natural atomic unit.
+    const upsertPage = db.transaction((pageItems: any[]) => {
+      for (const it of pageItems) {
+        // A single malformed item (bad resource URL, etc.) must not abort the whole ingest run —
+        // skip it, count it, and keep going.
+        try {
+          const url: string = it.resource;
+          if (!url?.startsWith("http")) continue;
+          const accept = it.accepts?.[0] ?? {};
+          // Real Bazaar shape: serviceName, tags[], accepts[{amount, network, asset}]
+          // Fallback: metadata.name, metadata.category, accepts[{maxAmountRequired}]
+          const name = it.serviceName ?? it.metadata?.name ?? null;
+          const tags = Array.isArray(it.tags) ? it.tags : [];
+          const category = tags.length > 0 ? tags[0] : (it.metadata?.category ?? null);
+          const amount = accept.amount ?? accept.maxAmountRequired;
+          const price_usdc = amount ? Number(amount) / 1e6 : null;
+          upsert.run({
+            id: url,
+            domain: new URL(url).hostname,
+            name,
+            category,
+            price_usdc,
+            network: accept.network ?? null,
+            now,
+            raw: JSON.stringify(it),
+          });
+          upserted++;
+        } catch {
+          malformed++;
+        }
       }
-    }
+    });
+    upsertPage(items);
     if (items.length === 0) {
       capExhausted = false;
       break;

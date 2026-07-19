@@ -59,6 +59,15 @@ server.registerTool(
   async ({ url }) => {
     const { status, json } = await api(`/score/${encodeURIComponent(url)}`);
     if (status === 404) return text({ service: url, error: "not in Assay's curated set" });
+    if (status === 402)
+      return text({
+        service: url,
+        payment_required: true,
+        detail:
+          "GET /score is a paid x402 endpoint ($0.005 USDC on Base mainnet). Retry through an " +
+          "x402-capable client to purchase the full report, or use the free check_service tool " +
+          "for the tier verdict.",
+      });
     return text(json);
   }
 );

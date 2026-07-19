@@ -6,6 +6,7 @@ import {
   canonicalProbeLeaf,
   computeDayDigest,
   anchorMissingDigests,
+  completedDays,
   localDay,
 } from "../src/digest.js";
 import { buildApp } from "../src/server.js";
@@ -126,5 +127,45 @@ describe("anchorMissingDigests", () => {
     expect(j[0].n_probes).toBe(1);
     expect(j[0].anchors).toEqual(["https://cal.test"]);
     expect(JSON.stringify(j)).not.toContain("cA==");
+  });
+});
+
+describe("digest race protection", () => {
+  it("does not freeze yesterday inside the safety lag, and captures late-landing rows after it", async () => {
+    const db = openDb(":memory:");
+    seedService(db);
+    const yesterdayNoon = new Date(2026, 6, 10, 12).getTime();
+    seedProbe(db, "https://svc.example/a", yesterdayNoon);
+    const stamper = async () => [{ calendar: "https://cal.test", proof_b64: "cA==", at: 1 }];
+
+    // 00:30 next day — inside the lag: a midnight-straddling sweep may still be landing rows.
+    const justAfterMidnight = new Date(2026, 6, 11, 0, 30).getTime();
+    let r = await anchorMissingDigests(db, { now: () => justAfterMidnight, stamper });
+    expect(r.digested).toEqual([]);
+
+    // The race: a probe stamped with YESTERDAY's ts lands late (sweep started before midnight).
+    seedProbe(db, "https://svc.example/a", new Date(2026, 6, 10, 23, 59, 50).getTime());
+
+    // 02:30 — past the lag: the digest freezes and includes the late row.
+    const pastLag = new Date(2026, 6, 11, 2, 30).getTime();
+    r = await anchorMissingDigests(db, { now: () => pastLag, stamper });
+    expect(r.digested).toEqual([localDay(yesterdayNoon)]);
+    const row: any = db
+      .prepare("SELECT n_probes FROM digests WHERE day=?")
+      .get(localDay(yesterdayNoon));
+    expect(row.n_probes).toBe(2); // digest<->DB correspondence intact
+  });
+
+  it("iterates calendar days without skips or repeats across a DST-spanning range", () => {
+    const start = new Date(2026, 0, 1, 8).getTime(); // Jan 1
+    const now = new Date(2026, 3, 10, 12).getTime(); // Apr 10 — spans spring-forward in DST zones
+    const days = [...completedDays(start, now)];
+    expect(days[0]).toBe("2026-01-01");
+    expect(days[days.length - 1]).toBe("2026-04-09");
+    expect(new Set(days).size).toBe(days.length); // no repeats
+    for (let i = 1; i < days.length; i++) {
+      const [y, m, d] = days[i - 1].split("-").map(Number);
+      expect(days[i]).toBe(localDay(new Date(y, m - 1, d + 1).getTime())); // exactly +1 calendar day
+    }
   });
 });

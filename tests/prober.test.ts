@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { openDb } from "../src/db.js";
 import { saveTemplate } from "../src/templates.js";
+import { encodePaymentResponseHeader } from "@x402/core/http";
 import { setSetting } from "../src/db.js";
 import { runProbes, spentTodayUsdc, withinCap, paymentAllowed, HARD_CAP_USDC_UNITS, BASE_USDC } from "../src/prober.js";
 
@@ -63,6 +64,37 @@ describe("runProbes", () => {
     expect(r.probed).toBe(1);
     const p: any = db.prepare("SELECT * FROM probes").get();
     expect(p.usdc_cost).toBe(0);
+  });
+
+  it("captures the settlement tx hash from the PAYMENT-RESPONSE header", async () => {
+    const db = openDb(":memory:");
+    seed(db);
+    const header = encodePaymentResponseHeader({
+      success: true,
+      transaction: "0xfeedbeef",
+      network: "eip155:8453",
+      payer: "0x1",
+    } as any);
+    const payFetch = (async () =>
+      new Response(JSON.stringify({ price: 3030 }), {
+        status: 200,
+        headers: { "PAYMENT-RESPONSE": header },
+      })) as typeof fetch;
+    await runProbes(db, { payFetch, refFetch: cgFetch });
+    const p: any = db.prepare("SELECT payment_tx FROM probes").get();
+    expect(p.payment_tx).toBe("0xfeedbeef");
+  });
+
+  it("spentTodayUsdc counts only probes after local midnight", () => {
+    const db = openDb(":memory:");
+    seed(db);
+    const ins = db.prepare(
+      "INSERT INTO probes (service_id, ts, ok_settlement, usdc_cost) VALUES (?,?,1,?)"
+    );
+    ins.run("https://api.example.com/price", new Date(2026, 6, 14, 23, 59).getTime(), 5); // yesterday
+    ins.run("https://api.example.com/price", new Date(2026, 6, 15, 0, 1).getTime(), 0.25); // today
+    const noon = new Date(2026, 6, 15, 12).getTime();
+    expect(spentTodayUsdc(db, noon)).toBeCloseTo(0.25);
   });
 
   it("halts immediately when paused mid-run", async () => {

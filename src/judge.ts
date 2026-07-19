@@ -33,7 +33,10 @@ export async function judgeResponse(
     // Accept ONLY a standalone decimal in [0,1]: whole match against anchored pattern
     if (!/^(0(\.\d+)?|1(\.0+)?|\.\d+)$/.test(text)) return null;
     return Number(text);
-  } catch {
+  } catch (e: any) {
+    // Fail-safe null (the component just doesn't count) — but LOUDLY: a bad API key or dead
+    // model id would otherwise silently zero the T3 component for every probe, forever.
+    console.error(`[judge] scoring failed: ${String(e?.message ?? e).slice(0, 200)}`);
     return null;
   }
 }

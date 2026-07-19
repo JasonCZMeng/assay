@@ -66,8 +66,11 @@ sudo systemctl reload caddy
 
 1. Create a receive wallet (address only on the server — never its key).
 2. **Facilitator (required):** the default `x402.org/facilitator` is testnet-only. Mainnet
-   settlement needs the CDP facilitator — create a CDP API key, set `FACILITATOR_URL` (and
-   auth per CDP docs). This also makes Assay eligible for Bazaar listing.
+   settlement needs the CDP facilitator — create a CDP API key and set `CDP_API_KEY_ID` +
+   `CDP_API_KEY_SECRET` in .env; the server selects the CDP facilitator automatically when
+   both are present (`FACILITATOR_URL` is only the non-CDP fallback and is ignored in that
+   case). Key must be IP-allowlisted to the VPS IPv4; the systemd unit already forces IPv4
+   egress. This also makes Assay eligible for Bazaar listing.
 3. Set `PAYMENTS_ENABLED=true`, `RECEIVE_WALLET_ADDRESS=0x...`, restart.
 4. Confirm `/score/<id>` answers HTTP 402 and settles a real payment end-to-end.
 5. List Assay's /score endpoint with `discoverable: true` and rich metadata.

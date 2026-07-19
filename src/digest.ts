@@ -92,6 +92,29 @@ export async function otsStamp(rootHex: string, fetchFn: typeof fetch = fetch): 
   return anchors;
 }
 
+// A day's merkle root is only frozen once the day has been over for this long. A sweep that
+// STARTS before midnight stamps each probe's ts at request time but inserts the row after the
+// response arrives — without this lag, a row carrying day-D's ts could land after day D's root
+// was anchored, permanently breaking the digest<->DB correspondence the provable-history claim
+// rests on. Two hours safely exceeds any sweep's worst case (per-probe fetch 30s + capped
+// judge/reference timeouts, 15 services sequential).
+export const DIGEST_SAFETY_LAG_MS = 2 * 3600_000;
+
+// Yield each completed local day from startTs whose day-end + safety lag has passed. Days are
+// advanced with setDate (calendar arithmetic), not a fixed 86.4M-ms stride — a fixed stride
+// drifts across DST changes and can skip or repeat a local day.
+export function* completedDays(startTs: number, nowTs: number): Generator<string> {
+  const d = new Date(startTs);
+  d.setHours(0, 0, 0, 0);
+  for (;;) {
+    const end = new Date(d);
+    end.setDate(end.getDate() + 1);
+    if (end.getTime() + DIGEST_SAFETY_LAG_MS > nowTs) return;
+    yield localDay(d.getTime());
+    d.setDate(d.getDate() + 1);
+  }
+}
+
 // Digest + anchor every completed local day that needs it. Runs at boot and on a daily cron,
 // so days missed while the PC slept are caught up. Idempotent: existing anchored rows are
 // untouched; rows that exist but failed to anchor are retried.
@@ -101,15 +124,13 @@ export async function anchorMissingDigests(
 ): Promise<{ digested: string[]; anchored: string[] }> {
   const now = deps.now ?? Date.now;
   const stamper = deps.stamper ?? otsStamp;
-  const today = localDay(now());
   const digested: string[] = [];
   const anchored: string[] = [];
 
   const first: any = db.prepare("SELECT MIN(ts) m FROM probes").get();
   if (!first?.m) return { digested, anchored };
 
-  for (let ts = first.m; localDay(ts) < today; ts += 86_400_000) {
-    const day = localDay(ts);
+  for (const day of completedDays(first.m, now())) {
     let row: any = db.prepare("SELECT day, anchors FROM digests WHERE day=?").get(day);
     if (!row) {
       const dg = computeDayDigest(db, day);

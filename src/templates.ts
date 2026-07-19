@@ -23,7 +23,9 @@ export type ProbeTemplate = z.infer<typeof ProbeTemplateSchema>;
 
 export function saveTemplate(db: Database.Database, input: ProbeTemplate): void {
   const t = ProbeTemplateSchema.parse(input);
-  const service = db.prepare("SELECT 1 FROM services WHERE id=?").get(t.serviceId);
+  const service = db.prepare("SELECT status FROM services WHERE id=?").get(t.serviceId) as
+    | { status: string }
+    | undefined;
   if (!service) throw new Error(`unknown service: ${t.serviceId}`);
   db.prepare(`
     INSERT INTO probe_templates (service_id, method, url, headers, body, response_schema, ground_truth, llm_rubric, created_at)
@@ -37,7 +39,15 @@ export function saveTemplate(db: Database.Database, input: ProbeTemplate): void 
     t.groundTruth ? JSON.stringify(t.groundTruth) : null,
     t.llmRubric ?? null, Date.now()
   );
-  db.prepare("UPDATE services SET status='curated' WHERE id=?").run(t.serviceId);
+  // A retired service keeps its status: `curate add` updates the template but must not silently
+  // undo an operator's retire decision — restoring is an explicit dashboard action.
+  if (service.status === "retired") {
+    console.error(
+      `[curate] ${t.serviceId} is retired — template saved, but service stays retired (restore via dashboard)`
+    );
+  } else {
+    db.prepare("UPDATE services SET status='curated' WHERE id=?").run(t.serviceId);
+  }
 }
 
 export function getTemplates(db: Database.Database): ProbeTemplate[] {

@@ -39,12 +39,15 @@ if (process.env.PAYMENTS_ENABLED === "true" && !process.env.RECEIVE_WALLET_ADDRE
   fail("PAYMENTS_ENABLED=true requires RECEIVE_WALLET_ADDRESS");
 }
 const host = process.env.HOST ?? "127.0.0.1";
-const publicHost = host !== "127.0.0.1" && host !== "localhost";
-if (publicHost && (process.env.CONTROL_TOKEN ?? "1") === "1") {
-  fail(`HOST=${host} is publicly bound but CONTROL_TOKEN is the localhost default — set a strong secret`);
+// A public deployment is EITHER a non-loopback bind OR loopback behind a reverse proxy
+// (TRUST_PROXY=true, the production shape) — keying on HOST alone left the proxy case unchecked.
+const publicDeploy =
+  (host !== "127.0.0.1" && host !== "localhost") || process.env.TRUST_PROXY === "true";
+if (publicDeploy && (process.env.CONTROL_TOKEN ?? "1") === "1") {
+  fail(`public deployment (HOST=${host}, TRUST_PROXY=${process.env.TRUST_PROXY ?? "false"}) but CONTROL_TOKEN is the localhost default — set a strong secret`);
 }
-if (publicHost && Number(process.env.RATE_LIMIT_RPM ?? "120") === 0) {
-  fail(`HOST=${host} is publicly bound with rate limiting disabled`);
+if (publicDeploy && Number(process.env.RATE_LIMIT_RPM ?? "120") === 0) {
+  fail(`public deployment with rate limiting disabled`);
 }
 
 process.exit(ok ? 0 : 1);

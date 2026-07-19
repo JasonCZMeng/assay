@@ -17,7 +17,9 @@ function parseNumericEnv(name: string, fallback: number): number {
 export const config = {
   dbPath: process.env.DB_PATH ?? "data/assay.db",
   dailyBudgetUsdc: parseNumericEnv("DAILY_BUDGET_USDC", 5),
-  paymentsEnabled: process.env.PAYMENTS_ENABLED === "true",
+  // Accept the obvious truthy spellings — PAYMENTS_ENABLED=TRUE or =1 silently leaving the
+  // paid endpoint free is a revenue bug, not a configuration nicety.
+  paymentsEnabled: ["true", "1", "yes"].includes((process.env.PAYMENTS_ENABLED ?? "").toLowerCase()),
   probeWalletKey: process.env.PROBE_WALLET_KEY ?? "",
   receiveWalletAddress: process.env.RECEIVE_WALLET_ADDRESS ?? "",
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
