@@ -75,6 +75,13 @@ is anchored to. Use this to independently verify that scoring evidence predates 
 
 Liveness plus probe counts for the last 24 hours.
 
+## Tooling (npm)
+
+- **MCP server** — \`claude mcp add assay -- npx -y assay-oracle-mcp\` (or the equivalent
+  MCP config in any client): tools \`check_service\`, \`get_score\`, \`top_services\`.
+- **Spend guard** — \`npm install assay-x402-guard\`: wrap your paying fetch with
+  \`wrapFetchWithAssay\` and payments to services rated *avoid* throw before any money moves.
+
 ## Trust model
 
 - Every score derives solely from probes Assay itself paid for; probes carry settlement
