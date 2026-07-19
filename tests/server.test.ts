@@ -43,6 +43,19 @@ describe("server", () => {
     expect(res.status).toBe(404);
   });
 
+  it("serves SKILL.md as free markdown at both casings", async () => {
+    const db = openDb(":memory:");
+    const app = buildApp(db);
+    for (const path of ["/SKILL.md", "/skill.md"]) {
+      const res = await app.request(path);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("markdown");
+      const text = await res.text();
+      expect(text).toContain("GET /score/");
+      expect(text).toContain("x402");
+    }
+  });
+
   it("healthz reports counts", async () => {
     const db = openDb(":memory:");
     seed(db);

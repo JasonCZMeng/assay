@@ -12,6 +12,7 @@ import { spentTodayUsdc } from "./prober.js";
 import { getSetting, setSetting } from "./db.js";
 import { DASHBOARD_HTML } from "./dashboard.js";
 import { LANDING_HTML } from "./landing.js";
+import { SKILL_MD } from "./skill.js";
 
 function escapeHtml(s: string): string {
   return s
@@ -97,13 +98,17 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
               payTo: config.receiveWalletAddress,
             },
             serviceName: "Assay",
+            // Bazaar metadata quality feeds the catalog's ranking composite; keep this a real
+            // natural-language description (placeholder text scores 0) and ≤500 chars. The
+            // SKILL.md link substitutes for the `skillUrl` field until the SDK grows one.
             description:
               "Quality score for any x402 service, earned by real paid probes with on-chain " +
               "receipts: composite 0-100, component breakdown (payment settlement, schema " +
-              "conformance, ground-truth accuracy, LLM-judged quality), 7-day trend, and probe " +
-              "count. Scores publish only after 20+ probes spread across days; daily corpus " +
-              "digests are Bitcoin-anchored via OpenTimestamps. Path: /score/{url-encoded " +
-              "service resource URL}. Free tier verdict at /tier/{url}; leaderboard at /leaderboard.",
+              "conformance, ground-truth accuracy, LLM-judged quality), 7-day trend, probe " +
+              "count. Scores publish only after 20+ probes across days; daily corpus digests " +
+              "are Bitcoin-anchored via OpenTimestamps. Path: /score/{url-encoded resource " +
+              "URL}. Free: /tier/{url}, /leaderboard. Agent guide: " +
+              "https://assay.nominal-labs.com/SKILL.md",
             mimeType: "application/json",
             tags: ["trust", "reputation", "quality", "score", "oracle", "verification", "ratings", "data"],
             // NB: no `method` field — DeclareDiscoveryExtensionInput omits it; the middleware
@@ -144,6 +149,15 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
     c.header("Cache-Control", "public, max-age=300");
     return c.html(LANDING_HTML);
   });
+
+  // Agent usage guide (see skill.ts). Lowercase alias because agents guess casing.
+  const serveSkill = (c: any) =>
+    c.body(SKILL_MD, 200, {
+      "Content-Type": "text/markdown; charset=utf-8",
+      "Cache-Control": "public, max-age=3600",
+    });
+  app.get("/SKILL.md", serveSkill);
+  app.get("/skill.md", serveSkill);
 
   app.get("/tier/:id", (c) => {
     const id = c.req.param("id");

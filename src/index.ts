@@ -9,6 +9,7 @@ import { ingestBazaar } from "./bazaar.js";
 import { runProbes, BASE_USDC } from "./prober.js";
 import { computeScores } from "./score.js";
 import { anchorMissingDigests } from "./digest.js";
+import { keepalivePurchase } from "./keepalive.js";
 import { buildApp } from "./server.js";
 
 const db = openDb();
@@ -74,6 +75,21 @@ setInterval(() => {
   const last = ((db.prepare("SELECT MAX(ts) m FROM probes").get() as any)?.m ?? 0) as number;
   if (Date.now() - last > 5.5 * 3600_000) void sweep("catchup");
 }, 15 * 60_000);
+
+// Bazaar keep-alive: one self-purchase of /score every 3 days (see keepalive.ts for why).
+// Gated on paymentsEnabled — without a 402 challenge there is no settlement to record, so
+// the purchase would just be a free GET.
+if (config.paymentsEnabled) {
+  cron.schedule("45 12 */3 * *", () =>
+    keepalivePurchase(db)
+      .then((r) =>
+        console.log(
+          `[keepalive] ok=${r.ok} status=${r.status ?? "-"}${r.error ? ` error=${r.error}` : ""}`
+        )
+      )
+      .catch((e) => console.error("[keepalive]", e))
+  );
+}
 
 // On-chain wallet snapshot for the dashboard, cached so polling stays off the RPC.
 const rpc = createPublicClient({ chain: base, transport: viemHttp("https://mainnet.base.org") });

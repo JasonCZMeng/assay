@@ -44,4 +44,7 @@ export const config = {
   // When both are set, the CDP facilitator (Base mainnet) is used instead of facilitatorUrl.
   cdpApiKeyId: process.env.CDP_API_KEY_ID ?? "",
   cdpApiKeySecret: process.env.CDP_API_KEY_SECRET ?? "",
+  // Public base URL of this deployment — the Bazaar keep-alive buys its own /score through
+  // the front door so the settlement is indistinguishable from a customer's.
+  publicUrl: process.env.PUBLIC_URL ?? "https://assay.nominal-labs.com",
 };
