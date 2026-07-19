@@ -4,6 +4,7 @@ import type Database from "better-sqlite3";
 import { paymentMiddleware, x402ResourceServer } from "@x402/hono";
 import { HTTPFacilitatorClient } from "@x402/core/server";
 import { createFacilitatorConfig } from "@coinbase/x402";
+import { bazaarResourceServerExtension, declareDiscoveryExtension } from "@x402/extensions/bazaar";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { config } from "./config.js";
 import { latestScore, tierFor } from "./score.js";
@@ -78,20 +79,60 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
       config.cdpApiKeyId && config.cdpApiKeySecret
         ? new HTTPFacilitatorClient(createFacilitatorConfig(config.cdpApiKeyId, config.cdpApiKeySecret))
         : new HTTPFacilitatorClient({ url: config.facilitatorUrl });
-    const resourceServer = new x402ResourceServer(facilitatorClient).register(
-      "eip155:8453",
-      new ExactEvmScheme()
-    );
+    const resourceServer = new x402ResourceServer(facilitatorClient)
+      .register("eip155:8453", new ExactEvmScheme())
+      // Bazaar discovery: enriches our 402 challenges with the declared metadata below so the
+      // CDP facilitator can catalog /score in the marketplace agents query.
+      .registerExtension(bazaarResourceServerExtension);
     app.use(
       paymentMiddleware(
         {
-          "GET /score/*": {
+          // Named param (not /score/*) so Bazaar discovery shows a meaningful parameter name.
+          // Service IDs are URL-encoded (slashes → %2F), so they're always a single segment.
+          "GET /score/:serviceUrl": {
             accepts: {
               scheme: "exact",
               price: "$0.005",
               network: "eip155:8453",
               payTo: config.receiveWalletAddress,
             },
+            serviceName: "Assay",
+            description:
+              "Quality score for any x402 service, earned by real paid probes with on-chain " +
+              "receipts: composite 0-100, component breakdown (payment settlement, schema " +
+              "conformance, ground-truth accuracy, LLM-judged quality), 7-day trend, and probe " +
+              "count. Scores publish only after 20+ probes spread across days; daily corpus " +
+              "digests are Bitcoin-anchored via OpenTimestamps. Path: /score/{url-encoded " +
+              "service resource URL}. Free tier verdict at /tier/{url}; leaderboard at /leaderboard.",
+            mimeType: "application/json",
+            tags: ["trust", "reputation", "quality", "score", "oracle", "verification", "ratings", "data"],
+            // NB: no `method` field — DeclareDiscoveryExtensionInput omits it; the middleware
+            // infers it from the route key ("GET /score/*").
+            extensions: declareDiscoveryExtension({
+              pathParams: {
+                serviceUrl: "https%3A%2F%2Fapi.example.com%2Fdata",
+              },
+              pathParamsSchema: {
+                properties: {
+                  serviceUrl: {
+                    type: "string",
+                    description:
+                      "URL-encoded resource URL of the x402 service to look up, exactly as advertised in the Bazaar",
+                  },
+                },
+                required: ["serviceUrl"],
+              },
+              output: {
+                example: {
+                  service: "https://api.example.com/data",
+                  composite: 94.3,
+                  components: { settlement: 1, schema: 0.95, groundTruth: 0.99, llm: 0.8 },
+                  nProbes: 42,
+                  trend: 1.2,
+                  ts: 1784150719964,
+                },
+              },
+            }),
           },
         },
         resourceServer
