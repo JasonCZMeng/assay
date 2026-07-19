@@ -62,13 +62,26 @@ describe("scorer", () => {
       expect(s.nProbes).toBe(19);
     });
 
-    it("exactly 20 probes yields non-null composite", () => {
+    it("exactly 20 probes across two days yields non-null composite", () => {
       const db = openDb(":memory:");
-      seedProbes(db, "https://boundary.example/b", 20);
+      // Explicit timestamps: hourly seeds can land in a single calendar day depending on
+      // wall-clock time, which the distinct-day gate rejects — pin two days deterministically.
+      const timestamps = Array.from({ length: 20 }, (_, i) => NOW - (i < 10 ? 0 : DAY));
+      seedProbes(db, "https://boundary.example/b", 20, { timestamps });
       computeScores(db, NOW);
       const s = latestScore(db, "https://boundary.example/b")!;
       expect(s.composite).not.toBeNull();
       expect(s.nProbes).toBe(20);
+    });
+
+    it("20+ probes bursted within a single day stay unrated (across-days gate)", () => {
+      const db = openDb(":memory:");
+      const timestamps = Array.from({ length: 25 }, () => NOW); // same instant, same day
+      seedProbes(db, "https://burst.example/a", 25, { timestamps });
+      computeScores(db, NOW);
+      const s = latestScore(db, "https://burst.example/a")!;
+      expect(s.composite).toBeNull();
+      expect(tierFor(s.composite)).toBe("unrated");
     });
   });
 

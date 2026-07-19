@@ -40,7 +40,11 @@ export function computeScores(db: Database.Database, now: number = Date.now()): 
     const rows = getRows.all(id, now - 30 * DAY) as (Row & { ts: number })[];
     const full = composite(rows);
     const recent = rows.filter((r) => r.ts >= now - 7 * DAY);
-    const comp = rows.length >= 20 ? full.value : null;
+    // "Scores publish only after 20+ probes spread across days" is a public claim (README,
+    // SKILL.md, the Bazaar listing) — enforce the "across days" half too: a same-day burst
+    // of probes must not mint a score.
+    const days = new Set(rows.map((r) => new Date(r.ts).toDateString()));
+    const comp = rows.length >= 20 && days.size >= 2 ? full.value : null;
     const trend = comp !== null && recent.length >= 5 ? composite(recent).value - full.value : null;
     insert.run(id, now, comp, JSON.stringify(full.components), rows.length, trend);
     count++;

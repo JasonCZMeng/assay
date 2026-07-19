@@ -74,3 +74,24 @@ sudo systemctl reload caddy
 3. Set `PAYMENTS_ENABLED=true`, `RECEIVE_WALLET_ADDRESS=0x...`, restart.
 4. Confirm `/score/<id>` answers HTTP 402 and settles a real payment end-to-end.
 5. List Assay's /score endpoint with `discoverable: true` and rich metadata.
+
+## 8. Updating a running deployment
+
+Ships from the dev machine as a git bundle (no GitHub pull needed on the VPS):
+
+```sh
+git bundle create /tmp/assay.bundle main
+ssh root@<vps> "rm -f /tmp/assay.bundle"   # sticky-bit /tmp blocks overwrite by scp
+scp /tmp/assay.bundle root@<vps>:/tmp/
+ssh root@<vps> "sudo -u assay git -C /opt/assay/app fetch /tmp/assay.bundle main \
+  && sudo -u assay git -C /opt/assay/app reset --hard FETCH_HEAD \
+  && cd /opt/assay/app && sudo -u assay npm install --no-audit --no-fund \
+  && systemctl restart assay"
+```
+
+`npm install`, **not** `npm ci`: a lockfile written on Windows lacks the linux/wasm
+optional dependencies and `ci` refuses to reconcile them.
+
+Backups: `/etc/cron.daily/assay-backup` takes a daily online snapshot of the corpus to
+`/opt/assay/backups/` (keeps 7). The snapshot uses better-sqlite3's `.backup()`, safe
+while the prober is writing.
