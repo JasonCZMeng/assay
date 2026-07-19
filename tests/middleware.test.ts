@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { wrapFetchWithAssay, AssayBlockedError } from "../middleware/index.js";
 
 function fakeLookup(tiers: Record<string, string | number>) {
@@ -71,6 +71,45 @@ describe("wrapFetchWithAssay", () => {
     await f("https://good.example/a");
     await f("https://good.example/a");
     expect(calls).toBe(1);
+  });
+
+  it("guards uppercase-scheme and whitespace-padded URLs — no normalization bypass", async () => {
+    const f = wrapFetchWithAssay(okBase, {
+      lookupFetch: fakeLookup({ "https://bad.example/a": "avoid" }),
+    });
+    await expect(f("HTTPS://bad.example/a")).rejects.toThrow(AssayBlockedError);
+    await expect(f("  https://bad.example/a")).rejects.toThrow(AssayBlockedError);
+  });
+
+  it("strips query strings and fragments from tier lookups", async () => {
+    let seen = "";
+    const lookup = (async (input: any) => {
+      seen = decodeURIComponent(String(input).split("/tier/")[1] ?? "");
+      return new Response(JSON.stringify({ tier: "avoid" }), { status: 200 });
+    }) as typeof fetch;
+    const f = wrapFetchWithAssay(okBase, { lookupFetch: lookup });
+    await expect(f("https://bad.example/a?api_key=SECRET#frag")).rejects.toThrow(AssayBlockedError);
+    expect(seen).toBe("https://bad.example/a");
+    expect(seen).not.toContain("SECRET");
+  });
+
+  it("re-checks after a transient lookup error instead of caching it for the full TTL", async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      const flaky = (async () => {
+        calls++;
+        if (calls === 1) return new Response("boom", { status: 500 });
+        return new Response(JSON.stringify({ tier: "avoid" }), { status: 200 });
+      }) as typeof fetch;
+      const f = wrapFetchWithAssay(okBase, { lookupFetch: flaky });
+      expect((await f("https://bad.example/a")).status).toBe(200); // fail-open on the blip
+      vi.advanceTimersByTime(61_000);
+      await expect(f("https://bad.example/a")).rejects.toThrow(AssayBlockedError); // guard restored
+      expect(calls).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("never guards requests to Assay itself", async () => {

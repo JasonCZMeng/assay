@@ -1,0 +1,30 @@
+{
+  "name": "assay-oracle-mcp",
+  "version": "0.1.0",
+  "mcpName": "io.github.JasonCZMeng/assay",
+  "description": "MCP server for Assay, the x402 service-quality oracle — check any machine-payable service's quality tier and score (earned by real paid probes with on-chain receipts) before your agent pays it.",
+  "type": "module",
+  "bin": { "assay-oracle-mcp": "dist/server.mjs" },
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc -p .",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": { "node": ">=18" },
+  "keywords": ["mcp", "modelcontextprotocol", "x402", "assay", "agents", "payments", "trust", "quality", "oracle", "base", "usdc"],
+  "homepage": "https://assay.nominal-labs.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JasonCZMeng/assay.git",
+    "directory": "mcp"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^6.0.3"
+  }
+}

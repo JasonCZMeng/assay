@@ -1,16 +1,32 @@
+#!/usr/bin/env node
 // Assay MCP server — lets any MCP-capable agent (Claude Code, Claude Desktop, etc.) check
-// x402 service quality before paying. Run: npx tsx mcp/server.mts
-// Config: ASSAY_URL (default https://assay.nominal-labs.com; Phase H sets the public domain).
+// x402 service quality before paying. Published as assay-oracle-mcp (npx -y assay-oracle-mcp);
+// from the repo: npx tsx mcp/server.mts
+// Config: ASSAY_URL (default https://assay.nominal-labs.com).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-const ASSAY_URL = process.env.ASSAY_URL ?? "https://assay.nominal-labs.com";
+// Trailing slash stripped: ASSAY_URL=https://host/ would otherwise build //tier/... paths
+// that 404 — silently answering "unknown" for every service instead of failing visibly.
+const ASSAY_URL = (process.env.ASSAY_URL ?? "https://assay.nominal-labs.com").replace(/\/+$/, "");
 
+// status 0 = network failure/timeout — callers turn any non-200 into a clean error result
+// instead of letting a raw exception (or a null-deref) surface through the MCP framework.
 async function api(path: string): Promise<{ status: number; json: any }> {
-  const res = await fetch(`${ASSAY_URL}${path}`, { signal: AbortSignal.timeout(10_000) });
-  return { status: res.status, json: await res.json().catch(() => null) };
+  try {
+    const res = await fetch(`${ASSAY_URL}${path}`, { signal: AbortSignal.timeout(10_000) });
+    return { status: res.status, json: await res.json().catch(() => null) };
+  } catch {
+    return { status: 0, json: null };
+  }
 }
+
+const apiError = (url: string, status: number) =>
+  text({
+    service: url,
+    error: status ? `assay lookup failed (HTTP ${status})` : "assay unreachable (network error or timeout)",
+  });
 
 const TIER_VERDICT: Record<string, string> = {
   gold: "consistently delivers what it charges for — safe to pay",
@@ -42,6 +58,7 @@ server.registerTool(
         tier: "unknown",
         verdict: "not in Assay's curated set — no paid-probe evidence exists; treat as unverified",
       });
+    if (status !== 200 || !json) return apiError(url, status);
     return text({ service: url, tier: json.tier, verdict: TIER_VERDICT[json.tier] ?? "" });
   }
 );
@@ -68,6 +85,7 @@ server.registerTool(
           "x402-capable client to purchase the full report, or use the free check_service tool " +
           "for the tier verdict.",
       });
+    if (status !== 200 || !json) return apiError(url, status);
     return text(json);
   }
 );

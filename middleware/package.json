@@ -3,9 +3,31 @@
   "version": "0.1.0",
   "description": "Pre-payment quality guard for x402 agents — blocks spend to services Assay rates 'avoid', backed by real paid probes with on-chain receipts.",
   "type": "module",
-  "main": "index.ts",
-  "keywords": ["x402", "assay", "agents", "payments", "trust", "quality", "base"],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc -p .",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": { "node": ">=18" },
+  "keywords": ["x402", "assay", "agents", "payments", "trust", "quality", "base", "usdc", "spend-guard"],
   "homepage": "https://assay.nominal-labs.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JasonCZMeng/assay.git",
+    "directory": "middleware"
+  },
   "license": "MIT",
-  "private": true
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^6.0.3"
+  }
 }
