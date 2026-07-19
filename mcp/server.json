@@ -1,0 +1,29 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.JasonCZMeng/assay",
+  "description": "MCP server for Assay, the x402 service-quality oracle — check any machine-payable service's quality tier and score (earned by real paid probes with on-chain receipts) before your agent pays it.",
+  "repository": {
+    "url": "https://github.com/JasonCZMeng/assay",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "assay-oracle-mcp",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "ASSAY_URL",
+          "description": "Assay instance to query (default: https://assay.nominal-labs.com)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}
