@@ -36,6 +36,19 @@ describe("server", () => {
     expect(j.components).toBeDefined();
   });
 
+  it("query-form /score alias matches the path form", async () => {
+    const db = openDb(":memory:");
+    seed(db);
+    const app = buildApp(db);
+    const res = await app.request(`/score?service=${encodeURIComponent("https://good.example/a")}`);
+    expect(res.status).toBe(200);
+    const j: any = await res.json();
+    expect(j.service).toBe("https://good.example/a");
+    expect(j.composite).toBeGreaterThan(85);
+    expect((await app.request("/score")).status).toBe(400); // missing param
+    expect((await app.request("/score?service=https%3A%2F%2Fnope.example%2Fx")).status).toBe(404);
+  });
+
   it("404s unknown services", async () => {
     const db = openDb(":memory:");
     const app = buildApp(db);

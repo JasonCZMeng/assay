@@ -75,6 +75,19 @@ describe("payments enabled (Phase H)", () => {
     expect(accepts).toContain("/icon.png");
   });
 
+  it("query-form /score is gated and pins the canonical public https resource", async () => {
+    const app = await freshApp();
+    const res = await app.request(`/score?service=${encodeURIComponent("https://good.example/a")}`);
+    expect(res.status).toBe(402);
+    const challenge = JSON.parse(
+      Buffer.from(res.headers.get("PAYMENT-REQUIRED")!, "base64").toString("utf8")
+    );
+    // The whole point of the query route: the catalog identity must be the public https
+    // URL regardless of how the request reached us (loopback here), or CDP drops it.
+    expect(challenge.resource.url).toBe("https://assay.nominal-labs.com/score");
+    expect(JSON.stringify(challenge)).toContain("5000");
+  });
+
   it("keeps /tier, /leaderboard and /healthz free while /score is gated", async () => {
     const app = await freshApp();
     // Drive middleware initialization to completion first so no init races the test teardown.

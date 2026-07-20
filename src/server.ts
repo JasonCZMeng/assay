@@ -86,18 +86,66 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
       // Bazaar discovery: enriches our 402 challenges with the declared metadata below so the
       // CDP facilitator can catalog /score in the marketplace agents query.
       .registerExtension(bazaarResourceServerExtension);
+    const scoreAccepts = {
+      scheme: "exact",
+      price: "$0.005",
+      network: "eip155:8453" as const,
+      payTo: config.receiveWalletAddress,
+    };
+    const scoreOutputExample = {
+      service: "https://api.example.com/data",
+      composite: 94.3,
+      components: { settlement: 1, schema: 0.95, groundTruth: 0.99, llm: 0.8 },
+      nProbes: 42,
+      trend: 1.2,
+      ts: 1784150719964,
+    };
     app.use(
       paymentMiddleware(
         {
+          // The Bazaar-facing form. Two hard-won facts (2026-07-20, after 24h unindexed):
+          // the catalog holds CONCRETE resource URLs only (0 of ~28k entries use path
+          // templates, 0 loopback — CDP silently drops those), and behind a TLS-terminating
+          // proxy the adapter derives http:// (or 127.0.0.1 for local requests). So this
+          // route pins `resource` to the canonical public https URL — every cataloging
+          // settlement advertises the same catalog identity no matter how it was reached.
+          "GET /score": {
+            resource: `${config.publicUrl}/score`,
+            accepts: scoreAccepts,
+            serviceName: "Assay",
+            description:
+              "Quality score for any x402 service, earned by real paid probes with on-chain " +
+              "receipts: composite 0-100, component breakdown (payment settlement, schema " +
+              "conformance, ground-truth accuracy, LLM-judged quality), 7-day trend, probe " +
+              "count. Scores publish only after 20+ probes across days; daily corpus digests " +
+              "are Bitcoin-anchored via OpenTimestamps. Query: /score?service={url-encoded " +
+              "resource URL}. Free: /tier/{url}, /leaderboard. Agent guide: " +
+              "https://assay.nominal-labs.com/SKILL.md",
+            mimeType: "application/json",
+            tags: ["trust", "reputation", "quality", "score", "oracle", "verification", "ratings", "data"],
+            iconUrl: `${config.publicUrl}/icon.png`,
+            extensions: declareDiscoveryExtension({
+              input: { service: "https%3A%2F%2Fapi.example.com%2Fdata" },
+              inputSchema: {
+                properties: {
+                  service: {
+                    type: "string",
+                    description:
+                      "URL-encoded resource URL of the x402 service to look up, exactly as advertised in the Bazaar",
+                  },
+                },
+                required: ["service"],
+              },
+              output: { example: scoreOutputExample },
+            }),
+          },
           // Named param (not /score/*) so Bazaar discovery shows a meaningful parameter name.
           // Service IDs are URL-encoded (slashes → %2F), so they're always a single segment.
+          // No `resource` override here: a static resource would mismatch the per-request
+          // URL, and customer x402 clients may validate that — the query form above is the
+          // catalog's front door.
           "GET /score/:serviceUrl": {
-            accepts: {
-              scheme: "exact",
-              price: "$0.005",
-              network: "eip155:8453",
-              payTo: config.receiveWalletAddress,
-            },
+            accepts: scoreAccepts,
             serviceName: "Assay",
             // Bazaar metadata quality feeds the catalog's ranking composite; keep this a real
             // natural-language description (placeholder text scores 0) and ≤500 chars. The
@@ -131,16 +179,7 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
                 },
                 required: ["serviceUrl"],
               },
-              output: {
-                example: {
-                  service: "https://api.example.com/data",
-                  composite: 94.3,
-                  components: { settlement: 1, schema: 0.95, groundTruth: 0.99, llm: 0.8 },
-                  nProbes: 42,
-                  trend: 1.2,
-                  ts: 1784150719964,
-                },
-              },
+              output: { example: scoreOutputExample },
             }),
           },
         },
@@ -178,6 +217,15 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
     if (!s) return c.json({ error: "unknown service" }, 404);
     c.header("Cache-Control", "public, max-age=3600");
     return c.json({ service: id, tier: tierFor(s.composite) });
+  });
+
+  // Query-param alias of /score/:id — the form the Bazaar catalog advertises.
+  app.get("/score", (c) => {
+    const id = c.req.query("service");
+    if (!id) return c.json({ error: "missing ?service= (URL-encoded x402 resource URL)" }, 400);
+    const s = latestScore(db, id);
+    if (!s) return c.json({ error: "unknown service" }, 404);
+    return c.json({ service: id, ...s });
   });
 
   app.get("/score/:id", (c) => {

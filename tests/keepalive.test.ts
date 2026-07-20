@@ -20,7 +20,7 @@ describe("keepalivePurchase", () => {
     const r = await keepalivePurchase(db, { payFetch, baseUrl: "https://assay.test" });
     expect(r.ok).toBe(true);
     expect(r.status).toBe(200);
-    expect(url).toBe("https://assay.test/score/" + encodeURIComponent("https://svc.example/data"));
+    expect(url).toBe("https://assay.test/score?service=" + encodeURIComponent("https://svc.example/data"));
   });
 
   it("reports failure without paying when no curated service exists", async () => {

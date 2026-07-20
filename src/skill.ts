@@ -32,7 +32,8 @@ so history cannot be quietly rewritten.
 ### \`GET /score/{serviceUrl}\` — paid ($0.005 USDC, Base)
 
 \`{serviceUrl}\` is the URL-encoded resource URL of the service, exactly as advertised in the
-Bazaar (e.g. \`/score/https%3A%2F%2Fapi.example.com%2Fdata\`).
+Bazaar (e.g. \`/score/https%3A%2F%2Fapi.example.com%2Fdata\`). Equivalent query form:
+\`GET /score?service={serviceUrl}\` (this is the form the Bazaar catalog advertises).
 
 Standard x402 flow: the request returns HTTP 402 with payment requirements (\`exact\` scheme,
 USDC on \`eip155:8453\`); pay with any x402 client (e.g. \`wrapFetchWithPayment\` from

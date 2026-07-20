@@ -21,10 +21,12 @@ export async function keepalivePurchase(
 
   // Goes out through the public URL like any customer: 402 challenge → pay → JSON. The
   // payment passes the same makePayFetch guards as probe spending (USDC-only, hard cap).
+  // Query form, not /score/:id — that route pins `resource` to the canonical public URL,
+  // so every keep-alive settlement reinforces the ONE Bazaar catalog entry.
   const payFetch = deps.payFetch ?? makePayFetch();
   const base = deps.baseUrl ?? config.publicUrl;
   try {
-    const res = await payFetch(`${base}/score/${encodeURIComponent(target)}`, {
+    const res = await payFetch(`${base}/score?service=${encodeURIComponent(target)}`, {
       signal: AbortSignal.timeout(30_000),
     });
     return { ok: res.ok, status: res.status, error: null };
