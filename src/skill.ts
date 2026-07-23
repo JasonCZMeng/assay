@@ -83,6 +83,12 @@ Liveness plus probe counts for the last 24 hours.
 - **Spend guard** — \`npm install assay-x402-guard\`: wrap your paying fetch with
   \`wrapFetchWithAssay\` and payments to services rated *avoid* throw before any money moves.
 
+## Operator badge
+
+Scored services can embed a live tier badge (SVG, served by Assay, always current —
+it can downgrade): \`https://assay.nominal-labs.com/badge/{url-encoded service URL}.svg\`.
+Link it to \`/tier/{url-encoded service URL}\` for the verdict page.
+
 ## Trust model
 
 - Every score derives solely from probes Assay itself paid for; probes carry settlement

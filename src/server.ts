@@ -14,15 +14,8 @@ import { DASHBOARD_HTML } from "./dashboard.js";
 import { LANDING_HTML } from "./landing.js";
 import { SKILL_MD } from "./skill.js";
 import { ICON_PNG, ICON_SVG } from "./icon.js";
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+import { renderBadge } from "./badge.js";
+import { renderLeaderboardPage } from "./leaderboard.js";
 
 // Callbacks the long-running process wires in; absent in tests and the API-only surface.
 export type AppOpts = {
@@ -238,22 +231,25 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
   app.get("/leaderboard", (c) => {
     const rows = db
       .prepare(
-        `SELECT s.service_id, s.composite, s.n_probes, sv.domain
+        `SELECT s.service_id, s.composite, s.n_probes, s.trend, sv.domain, sv.price_usdc
          FROM scores s JOIN services sv ON sv.id = s.service_id
          WHERE s.ts = (SELECT MAX(ts) FROM scores WHERE service_id = s.service_id)
-         ORDER BY s.composite DESC NULLS LAST`
+           AND sv.status = 'curated'
+         ORDER BY s.composite DESC NULLS LAST, s.n_probes DESC`
       )
       .all() as any[];
-    const tr = rows
-      .map(
-        (r) =>
-          `<tr><td>${escapeHtml(r.domain)}</td><td>${r.composite?.toFixed(1) ?? "unrated"}</td><td>${tierFor(r.composite)}</td><td>${r.n_probes}</td></tr>`
-      )
-      .join("");
-    return c.html(
-      `<!doctype html><title>Assay Leaderboard</title><h1>Assay — x402 Quality Scores</h1>
-       <table border=1 cellpadding=6><tr><th>Service</th><th>Score</th><th>Tier</th><th>Probes</th></tr>${tr}</table>`
-    );
+    c.header("Cache-Control", "public, max-age=300");
+    return c.html(renderLeaderboardPage(rows));
+  });
+
+  // Live tier badge for scored operators to embed. Served from our domain so it always
+  // shows the CURRENT verdict — it can downgrade, which is exactly why it's worth pixels.
+  app.get("/badge/:serviceUrl", (c) => {
+    const id = c.req.param("serviceUrl").replace(/\.svg$/, "");
+    const s = latestScore(db, id);
+    if (!s) return c.json({ error: "unknown service" }, 404);
+    c.header("Cache-Control", "public, max-age=3600");
+    return c.body(renderBadge(s.composite, s.nProbes), 200, { "Content-Type": "image/svg+xml" });
   });
 
   app.get("/healthz", (c) => {

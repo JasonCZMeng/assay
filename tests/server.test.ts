@@ -14,6 +14,16 @@ function seed(db: any) {
   computeScores(db);
 }
 
+// Direct score row with a chosen composite — for badge/leaderboard rendering assertions.
+function seedScored(db: any, id: string, composite: number) {
+  db.prepare(
+    "INSERT INTO services (id, domain, status, price_usdc, first_seen, last_seen, raw) VALUES (?,?,?,?,?,?,?)"
+  ).run(id, new URL(id).hostname, "curated", 0.005, 1, 1, "{}");
+  db.prepare(
+    "INSERT INTO scores (service_id, ts, composite, components, n_probes, trend) VALUES (?,?,?,'{}',30,1.1)"
+  ).run(id, Date.now(), composite);
+}
+
 describe("server", () => {
   it("serves free tier labels", async () => {
     const db = openDb(":memory:");
@@ -67,6 +77,39 @@ describe("server", () => {
       expect(text).toContain("GET /score/");
       expect(text).toContain("x402");
     }
+  });
+
+  it("serves a live tier badge, strips the .svg suffix, 404s unknown services", async () => {
+    const db = openDb(":memory:");
+    seedScored(db, "https://svc.example/a", 94.3);
+    const app = buildApp(db);
+    const res = await app.request(`/badge/${encodeURIComponent("https://svc.example/a")}.svg`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/svg+xml");
+    const svg = await res.text();
+    expect(svg).toContain("GOLD");
+    expect(svg).toContain("94.3");
+    expect((await app.request(`/badge/${encodeURIComponent("https://nope.example/x")}.svg`)).status).toBe(404);
+  });
+
+  it("renders the leaderboard ledger with scored and in-assay rows", async () => {
+    const db = openDb(":memory:");
+    seedScored(db, "https://svc.example/a", 91.2);
+    // unrated service: curated with a null-composite score row
+    db.prepare(
+      "INSERT INTO services (id, domain, status, first_seen, last_seen, raw) VALUES (?,?,?,?,?,?)"
+    ).run("https://new.example/b", "new.example", "curated", 1, 1, "{}");
+    db.prepare(
+      "INSERT INTO scores (service_id, ts, composite, components, n_probes, trend) VALUES (?,?,NULL,'{}',13,NULL)"
+    ).run("https://new.example/b", Date.now());
+    const res = await buildApp(db).request("/leaderboard");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toContain("max-age=300");
+    const html = await res.text();
+    expect(html).toContain("svc.example");
+    expect(html).toContain("91.2");
+    expect(html).toContain("in assay · 13");
+    expect(html).toContain("Ledger of Record");
   });
 
   it("serves the brand icon as PNG and SVG", async () => {
