@@ -1,0 +1,41 @@
+{
+  "method": "GET",
+  "url": "https://store.agentexchange.work/crypto/prices?ids=bitcoin,ethereum",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["prices"],
+    "properties": {
+      "prices": {
+        "type": "object",
+        "required": ["bitcoin", "ethereum"],
+        "properties": {
+          "bitcoin": {
+            "type": "object",
+            "required": ["price"],
+            "properties": {
+              "price": { "type": "number" },
+              "symbol": { "type": "string" }
+            }
+          },
+          "ethereum": {
+            "type": "object",
+            "required": ["price"],
+            "properties": {
+              "price": { "type": "number" },
+              "symbol": { "type": "string" }
+            }
+          }
+        }
+      },
+      "source": { "type": "string" }
+    }
+  },
+  "groundTruth": {
+    "path": "prices.bitcoin.price",
+    "refSource": "coingecko",
+    "refId": "bitcoin",
+    "refField": "usd",
+    "tolerancePct": 1.5
+  }
+}

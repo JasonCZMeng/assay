@@ -1,0 +1,36 @@
+{
+  "method": "GET",
+  "url": "https://coingecko.use.x402atlas.com/markets?vs_currency=usd&page=1&per_page=10",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["markets"],
+    "properties": {
+      "markets": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["id", "current_price"],
+          "properties": {
+            "id": { "type": "string" },
+            "symbol": { "type": "string" },
+            "name": { "type": "string" },
+            "current_price": { "type": "number" },
+            "market_cap_rank": { "type": "number" }
+          }
+        }
+      },
+      "vs_currency": { "type": "string" },
+      "queried_at": { "type": "string" }
+    }
+  },
+  "groundTruth": {
+    "path": "markets.0.current_price",
+    "refSource": "coingecko",
+    "refId": "bitcoin",
+    "refField": "usd",
+    "tolerancePct": 2
+  },
+  "llmRubric": "The response lists the top-10 coins by market cap with bitcoin ranked first at markets[0]; score 0.0 if the first entry is not bitcoin (which would also invalidate the ground-truth comparison), an error, or placeholder data."
+}

@@ -1,0 +1,28 @@
+{
+  "method": "GET",
+  "url": "https://api.tickersfeed.net/stock/AAPL/news",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["symbol", "articles"],
+    "properties": {
+      "symbol": { "type": "string" },
+      "articles": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["headline"],
+          "properties": {
+            "headline": { "type": "string" },
+            "summary": { "type": "string" },
+            "source": { "type": "string" },
+            "url": { "type": "string" },
+            "datetime": { "type": "number" }
+          }
+        }
+      }
+    }
+  },
+  "llmRubric": "The response contains real financial news about Apple (AAPL) from roughly the past 7 days: score 1.0 if headlines are substantive, Apple-relevant, attributed to real news sources, and timestamped recently; 0.5 if articles are real but stale or only tangentially about Apple; 0.0 for fabricated-looking headlines, lorem-ipsum placeholders, or an error."
+}

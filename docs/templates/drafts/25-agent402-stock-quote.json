@@ -1,0 +1,23 @@
+{
+  "method": "GET",
+  "url": "https://agent402.tools/api/stock-quote?symbol=AAPL",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["symbol", "price", "currency"],
+    "properties": {
+      "symbol": { "type": "string" },
+      "name": { "type": "string" },
+      "price": { "type": "number" },
+      "currency": { "type": "string" },
+      "previousClose": { "type": "number" },
+      "dayHigh": { "type": "number" },
+      "dayLow": { "type": "number" },
+      "fiftyTwoWeekHigh": { "type": "number" },
+      "fiftyTwoWeekLow": { "type": "number" },
+      "changePct": { "type": "number" },
+      "regularMarketTime": { "type": "string" }
+    }
+  },
+  "llmRubric": "The response is a live-ish AAPL stock quote in USD: score 1.0 if the quote is internally consistent (dayLow <= price <= dayHigh where present, price within the 52-week range, plausible Apple share-price magnitude in the low hundreds of USD) with a recent market timestamp; 0.5 for a plausible price with missing or inconsistent range fields; 0.0 for implausible values, placeholder data, or an error."
+}

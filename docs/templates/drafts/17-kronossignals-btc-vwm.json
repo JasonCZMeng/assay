@@ -1,0 +1,33 @@
+{
+  "method": "GET",
+  "url": "https://kronossignals.com/api/v1/price/btc",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["price", "asset"],
+    "properties": {
+      "price": { "type": "number" },
+      "asset": { "type": "string" },
+      "price_simple_median": { "type": "number" },
+      "confidence": { "type": "string" },
+      "sources": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "exchange": { "type": "string" },
+            "price": { "type": "number" }
+          }
+        }
+      },
+      "as_of": { "type": "string" }
+    }
+  },
+  "groundTruth": {
+    "path": "price",
+    "refSource": "coingecko",
+    "refId": "bitcoin",
+    "refField": "usd",
+    "tolerancePct": 1.5
+  }
+}

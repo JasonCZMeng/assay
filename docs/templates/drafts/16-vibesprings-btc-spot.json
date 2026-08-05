@@ -1,0 +1,25 @@
+{
+  "method": "GET",
+  "url": "https://vibesprings.net/api/price/btc-usd",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["price", "symbol", "currency"],
+    "properties": {
+      "price": { "type": "number" },
+      "symbol": { "type": "string" },
+      "currency": { "type": "string" },
+      "high24h": { "type": "number" },
+      "low24h": { "type": "number" },
+      "volume24h": { "type": "number" },
+      "exchange": { "type": "string" }
+    }
+  },
+  "groundTruth": {
+    "path": "price",
+    "refSource": "coingecko",
+    "refId": "bitcoin",
+    "refField": "usd",
+    "tolerancePct": 1.5
+  }
+}

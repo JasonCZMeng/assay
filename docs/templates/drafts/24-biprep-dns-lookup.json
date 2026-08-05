@@ -1,0 +1,20 @@
+{
+  "method": "GET",
+  "url": "https://tools.bip-rep.com/dns?domain=example.com&type=A",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["domain", "records"],
+    "properties": {
+      "domain": { "type": "string" },
+      "type": { "type": "string" },
+      "records": {
+        "type": "array",
+        "minItems": 1,
+        "items": { "type": "string" }
+      },
+      "latency_ms": { "type": "number" }
+    }
+  },
+  "llmRubric": "The response is an A-record DNS lookup for example.com: score 1.0 if records contains one or more syntactically valid public IPv4 addresses (example.com resolves to IANA-operated addresses, historically in ranges like 93.184.x.x or 23.x.x.x edge networks); 0.5 if the shape is right but addresses look odd (private ranges, loopback); 0.0 for empty records, non-IP strings, or an error."
+}

@@ -1,0 +1,26 @@
+{
+  "method": "POST",
+  "url": "https://furigana.agentic-jp.com/furigana",
+  "headers": { "Content-Type": "application/json" },
+  "body": "{\"text\":\"東京都千代田区永田町\",\"options\":{\"to\":\"hiragana\",\"mode\":\"normal\",\"romaji_style\":\"hepburn\"}}",
+  "responseSchema": {
+    "type": "object",
+    "required": ["result"],
+    "properties": {
+      "input": { "type": "string" },
+      "result": { "type": "string" },
+      "tokens": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "surface": { "type": "string" },
+            "reading": { "type": "string" },
+            "pos": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "llmRubric": "The response converts the Japanese text 東京都千代田区永田町 to hiragana: score 1.0 for the correct reading とうきょうとちよだくながたちょう (minor okurigana variants acceptable) with a sensible per-token breakdown, 0.5 for a mostly-correct reading with token errors, 0.0 for wrong readings, non-hiragana output, or an error."
+}

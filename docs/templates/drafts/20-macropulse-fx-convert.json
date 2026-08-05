@@ -1,0 +1,38 @@
+{
+  "method": "GET",
+  "url": "https://macropulse.theaslangroupllc.com/api/fx/convert?from=USD&to=EUR,GBP&amount=250",
+  "headers": {},
+  "responseSchema": {
+    "type": "object",
+    "required": ["from", "to", "amount_in", "date"],
+    "properties": {
+      "from": { "type": "string" },
+      "amount_in": { "type": "number" },
+      "date": { "type": "string" },
+      "to": {
+        "type": "object",
+        "required": ["EUR", "GBP"],
+        "properties": {
+          "EUR": {
+            "type": "object",
+            "required": ["rate", "amount"],
+            "properties": {
+              "rate": { "type": "number" },
+              "amount": { "type": "number" }
+            }
+          },
+          "GBP": {
+            "type": "object",
+            "required": ["rate", "amount"],
+            "properties": {
+              "rate": { "type": "number" },
+              "amount": { "type": "number" }
+            }
+          }
+        }
+      },
+      "source": { "type": "string" }
+    }
+  },
+  "llmRubric": "The response converts 250 USD to EUR and GBP at a recent ECB reference fixing: score 1.0 if both rates are in a plausible range (roughly 0.70-1.10 EUR per USD, 0.55-0.95 GBP per USD), each amount equals 250 times its rate, and the reported date is a recent business day; 0.5 if only one currency is correct; 0.0 for implausible rates, arithmetic errors, or an error response."
+}
