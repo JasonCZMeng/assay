@@ -137,3 +137,49 @@ export function wrapFetchWithAssay(
   };
   return wrapped as typeof fetch;
 }
+
+// rankCandidates — one free bulk call to order a candidate list before an agent picks who
+// to pay. Unknown ranks below unrated: unrated is at least catalogued and being probed.
+const RANK_ALL: Record<AssayTier | "unknown", number> = { gold: 4, ok: 3, unrated: 2, unknown: 1, avoid: 0 };
+
+export async function rankCandidates(
+  urls: string[],
+  opts: { assayUrl?: string; lookupFetch?: typeof fetch } = {}
+): Promise<{ service: string; tier: AssayTier | "unknown" }[]> {
+  const assayUrl = (opts.assayUrl ?? "https://assay.nominal-labs.com").replace(/\/$/, "");
+  const lookupFetch = opts.lookupFetch ?? fetch;
+  const q = urls.map(encodeURIComponent).join(",");
+  const res = await lookupFetch(`${assayUrl}/tiers?services=${q}`, {
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new Error(`assay /tiers lookup failed: HTTP ${res.status}`);
+  const { tiers } = (await res.json()) as { tiers: { service: string; tier: AssayTier | "unknown" }[] };
+  return tiers
+    .map((t, i) => ({ ...t, i }))
+    .sort((a, b) => RANK_ALL[b.tier] - RANK_ALL[a.tier] || a.i - b.i)
+    .map(({ service, tier }) => ({ service, tier }));
+}
+
+export type AssayScore = {
+  service: string;
+  composite: number | null;
+  components: Record<string, number | null>;
+  nProbes: number;
+  trend: number | null;
+  ts: number;
+};
+
+// purchaseScore — buy the full evidence report ($0.005) with the agent's own paying fetch.
+// The natural follow-up to a block or a ranking tie: tier is the free verdict, this is proof.
+export async function purchaseScore(
+  serviceUrl: string,
+  payFetch: typeof fetch,
+  opts: { assayUrl?: string } = {}
+): Promise<AssayScore> {
+  const assayUrl = (opts.assayUrl ?? "https://assay.nominal-labs.com").replace(/\/$/, "");
+  const res = await payFetch(`${assayUrl}/score?service=${encodeURIComponent(serviceUrl)}`, {
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) throw new Error(`assay /score purchase failed: HTTP ${res.status}`);
+  return (await res.json()) as AssayScore;
+}
