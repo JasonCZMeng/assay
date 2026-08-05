@@ -174,4 +174,33 @@ describe("server", () => {
     expect(text).toContain("&lt;script&gt;");
     expect(text).not.toContain("<script>alert");
   });
+
+  it("bulk /tiers ranks a candidate list in one call", async () => {
+    const db = openDb(":memory:");
+    seedScored(db, "https://gold.example/a", 95);
+    seedScored(db, "https://mid.example/a", 70);
+    const app = buildApp(db);
+    const q = ["https://gold.example/a", "https://mid.example/a", "https://ghost.example/x"]
+      .map(encodeURIComponent)
+      .join(",");
+    const res = await app.request(`/tiers?services=${q}`);
+    expect(res.status).toBe(200);
+    const j: any = await res.json();
+    expect(j.tiers).toEqual([
+      { service: "https://gold.example/a", tier: "gold" },
+      { service: "https://mid.example/a", tier: "ok" },
+      { service: "https://ghost.example/x", tier: "unknown" },
+    ]);
+    expect(res.headers.get("cache-control")).toContain("max-age=300");
+  });
+
+  it("bulk /tiers rejects missing and oversized requests", async () => {
+    const db = openDb(":memory:");
+    const app = buildApp(db);
+    expect((await app.request("/tiers")).status).toBe(400);
+    const many = Array.from({ length: 51 }, (_, i) =>
+      encodeURIComponent(`https://s${i}.example/a`)
+    ).join(",");
+    expect((await app.request(`/tiers?services=${many}`)).status).toBe(400);
+  });
 });

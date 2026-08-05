@@ -212,6 +212,30 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
     return c.json({ service: id, tier: tierFor(s.composite) });
   });
 
+  // Bulk form of /tier — one call to rank a whole candidate list. Free and label-only
+  // like /tier; the paid /score endpoint is where composites and evidence live.
+  app.get("/tiers", (c) => {
+    const raw = c.req.query("services");
+    if (!raw)
+      return c.json({ error: "missing ?services= (comma-separated URL-encoded resource URLs)" }, 400);
+    // Elements are individually URL-encoded by clients so the commas that join the list
+    // survive; decode per element (the once-only Hono decode rule applies to route params).
+    const ids = raw.split(",").filter(Boolean).map((s) => {
+      try {
+        return decodeURIComponent(s);
+      } catch {
+        return s;
+      }
+    });
+    if (ids.length > 50) return c.json({ error: "max 50 services per request" }, 400);
+    const tiers = ids.map((id) => {
+      const s = latestScore(db, id);
+      return { service: id, tier: s ? tierFor(s.composite) : "unknown" };
+    });
+    c.header("Cache-Control", "public, max-age=300");
+    return c.json({ tiers });
+  });
+
   // Query-param alias of /score/:id — the form the Bazaar catalog advertises.
   app.get("/score", (c) => {
     const id = c.req.query("service");
