@@ -209,7 +209,17 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
     const s = latestScore(db, id);
     if (!s) return c.json({ error: "unknown service" }, 404);
     c.header("Cache-Control", "public, max-age=3600");
-    return c.json({ service: id, tier: tierFor(s.composite) });
+    // The free label carries its own upsell: agents that want proof shouldn't have to
+    // find the paid endpoint by reading docs.
+    return c.json({
+      service: id,
+      tier: tierFor(s.composite),
+      evidence: {
+        url: `${config.publicUrl}/score?service=${encodeURIComponent(id)}`,
+        price_usdc: 0.005,
+        note: "full score + component breakdown + probe evidence (x402-paid)",
+      },
+    });
   });
 
   // Bulk form of /tier — one call to rank a whole candidate list. Free and label-only
@@ -233,7 +243,13 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
       return { service: id, tier: s ? tierFor(s.composite) : "unknown" };
     });
     c.header("Cache-Control", "public, max-age=300");
-    return c.json({ tiers });
+    return c.json({
+      tiers,
+      evidence: {
+        url_template: `${config.publicUrl}/score?service={url-encoded id}`,
+        price_usdc: 0.005,
+      },
+    });
   });
 
   // Query-param alias of /score/:id — the form the Bazaar catalog advertises.

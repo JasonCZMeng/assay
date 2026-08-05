@@ -194,6 +194,23 @@ describe("server", () => {
     expect(res.headers.get("cache-control")).toContain("max-age=300");
   });
 
+  it("free tier responses point at the paid evidence endpoint", async () => {
+    const db = openDb(":memory:");
+    seedScored(db, "https://gold.example/a", 95);
+    const app = buildApp(db);
+    const one: any = await (
+      await app.request(`/tier/${encodeURIComponent("https://gold.example/a")}`)
+    ).json();
+    expect(one.evidence.url).toBe(
+      "https://assay.nominal-labs.com/score?service=" + encodeURIComponent("https://gold.example/a")
+    );
+    expect(one.evidence.price_usdc).toBe(0.005);
+    const bulk: any = await (
+      await app.request(`/tiers?services=${encodeURIComponent("https://gold.example/a")}`)
+    ).json();
+    expect(bulk.evidence.url_template).toContain("/score?service=");
+  });
+
   it("bulk /tiers rejects missing and oversized requests", async () => {
     const db = openDb(":memory:");
     const app = buildApp(db);
