@@ -6,12 +6,12 @@
     "url": "https://github.com/JasonCZMeng/assay",
     "source": "github"
   },
-  "version": "0.1.0",
+  "version": "0.2.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "assay-oracle-mcp",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "transport": {
         "type": "stdio"
       },
@@ -22,6 +22,13 @@
           "isRequired": false,
           "format": "string",
           "isSecret": false
+        },
+        {
+          "name": "ASSAY_WALLET_KEY",
+          "description": "Optional Base wallet private key; when set, get_score auto-purchases full reports ($0.005, hard-capped 0.01 USDC/call)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
         }
       ]
     }
