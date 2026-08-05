@@ -1,6 +1,6 @@
 {
   "name": "assay-x402-guard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Pre-payment quality guard for x402 agents — blocks spend to services Assay rates 'avoid', backed by real paid probes with on-chain receipts.",
   "type": "module",
   "main": "dist/index.js",

@@ -38,18 +38,21 @@ Requires Node 18+. No API key. (Not related to the npm package `assay-mcp`, a co
 | Tool | Cost | What it does |
 |---|---|---|
 | `check_service` | free | Quality tier (`gold` / `ok` / `avoid` / `unrated`) for an x402 resource URL, with a one-line verdict. Use before paying an unfamiliar endpoint. |
-| `get_score` | free lookup¹ | Full report: composite 0–100, component breakdown (settlement, schema, ground truth, LLM judge), 7-day trend, probe count. |
+| `rank_services` | free | One call to order up to 50 candidate x402 URLs best-first by tier. Use when choosing which of several services to pay. |
+| `get_score` | $0.005¹ | Full report: composite 0–100, component breakdown (settlement, schema, ground truth, LLM judge), 7-day trend, probe count. |
 | `top_services` | free | Ranked list of the x402 services Assay actively probes, best first. |
 
-¹ `GET /score` is itself a paid x402 endpoint ($0.005 USDC on Base). The tool reports the
-402 payment details when hit without payment; the free `check_service` tier verdict is
-sufficient for most pre-payment decisions.
+¹ `GET /score` is a paid x402 endpoint ($0.005 USDC on Base). Without a wallet the tool
+reports the 402 payment details; with `ASSAY_WALLET_KEY` set it purchases the report
+automatically. The free `check_service` / `rank_services` verdicts are sufficient for most
+pre-payment decisions.
 
 ## Configuration
 
 | Env var | Default | Purpose |
 |---|---|---|
 | `ASSAY_URL` | `https://assay.nominal-labs.com` | Assay instance to query |
+| `ASSAY_WALLET_KEY` | *(unset)* | Optional Base wallet private key. When set, `get_score` pays for reports itself — hard-capped at 0.01 USDC per call, Base-mainnet USDC only, refuses anything else. Fund it with a few dollars at most and use a dedicated wallet. |
 
 ## How to read the tiers
 

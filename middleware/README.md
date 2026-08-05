@@ -67,4 +67,33 @@ around bad services or surface the verdict to your agent.
 - **Strict-tier mode.** `minTier: "gold"` + `onUnrated: "block"` + `onUnknown: "block"`
   yields "only pay services with proven track records."
 
+## Ranking candidates (free)
+
+Choosing which of several services to pay? One bulk call orders them best-first:
+
+```ts
+import { rankCandidates } from "assay-x402-guard";
+
+const ranked = await rankCandidates([
+  "https://api-a.example/data",
+  "https://api-b.example/data",
+  "https://api-c.example/data",
+]);
+// [{ service: "https://api-b.example/data", tier: "gold" }, ...] — best first,
+// input order preserved within a tier. Tiers: gold > ok > unrated > unknown > avoid.
+```
+
+## Buying the evidence (paid, $0.005)
+
+The tier is the free verdict; `purchaseScore` buys the full report — composite 0–100,
+component breakdown, trend, probe count — using **your own** x402-paying fetch (this
+package stays zero-dependency and never touches keys):
+
+```ts
+import { purchaseScore } from "assay-x402-guard";
+
+const report = await purchaseScore("https://api-b.example/data", payFetch);
+// { service, composite: 94.3, components: { settlement, schema, groundTruth, llm }, ... }
+```
+
 Full agent guide: <https://assay.nominal-labs.com/SKILL.md> · MIT © Nominal Labs

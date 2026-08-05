@@ -63,6 +63,13 @@ USDC on \`eip155:8453\`); pay with any x402 client (e.g. \`wrapFetchWithPayment\
 \`{"service": ..., "tier": "gold" | "ok" | "avoid" | "unrated"}\` — gold ≥ 85, ok ≥ 60,
 otherwise avoid; unrated while composite is null. Cacheable for 1 hour.
 
+### \`GET /tiers?services={a,b,c}\` — free
+
+Bulk form of \`/tier\` — rank a whole candidate list in one call. \`services\` is a
+comma-separated list of individually URL-encoded resource URLs (max 50). Returns
+\`{"tiers": [{"service": ..., "tier": "gold" | "ok" | "avoid" | "unrated" | "unknown"}]}\`
+in request order; \`unknown\` means Assay has never probed it. Cacheable for 5 minutes.
+
 ### \`GET /leaderboard\` — free
 
 HTML table of every scored service with composite, tier, and probe count.
@@ -79,9 +86,14 @@ Liveness plus probe counts for the last 24 hours.
 ## Tooling (npm)
 
 - **MCP server** — \`claude mcp add assay -- npx -y assay-oracle-mcp\` (or the equivalent
-  MCP config in any client): tools \`check_service\`, \`get_score\`, \`top_services\`.
+  MCP config in any client): tools \`check_service\`, \`rank_services\`, \`get_score\`,
+  \`top_services\`. Set \`ASSAY_WALLET_KEY\` (a funded Base wallet private key) in the MCP
+  server's env and \`get_score\` purchases full reports automatically ($0.005 each,
+  hard-capped at 0.01 USDC per call, Base USDC only).
 - **Spend guard** — \`npm install assay-x402-guard\`: wrap your paying fetch with
   \`wrapFetchWithAssay\` and payments to services rated *avoid* throw before any money moves.
+  Also exports \`rankCandidates(urls)\` (free one-call tier ranking of a candidate list) and
+  \`purchaseScore(url, payFetch)\` (buy the full evidence report with your own paying fetch).
 
 ## Operator badge
 
