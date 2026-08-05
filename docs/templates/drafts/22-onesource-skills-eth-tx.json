@@ -1,19 +1,21 @@
 {
   "method": "GET",
-  "url": "https://skills.onesource.io/api/chain/tx/0xad7e04119ecd85857728205f5b12e95f0bab8e99f9c2f60be5dc79cfc6a8df1f?network=ethereum",
+  "url": "https://skills.onesource.io/api/chain/tx/0x80bcde339d13869c243853ee419d8f8f0d7ccd9f99add4642d269c521a2b5c5d?network=ethereum",
   "headers": {},
   "responseSchema": {
     "type": "object",
-    "required": ["hash", "from", "to", "block_number"],
+    "required": ["data"],
     "properties": {
-      "hash": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
-      "from": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
-      "to": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
-      "block_number": { "type": "string" },
-      "value": { "type": "string" },
-      "gas": { "type": "string" },
-      "nonce": { "type": "string" }
+      "data": {
+        "type": "object",
+        "required": ["transaction"],
+        "properties": {
+          "transaction": { "type": "object" },
+          "receipt": { "type": ["object", "null"] }
+        }
+      },
+      "meta": { "type": "object" }
     }
   },
-  "llmRubric": "This queries an immutable mined Ethereum transaction, so the answer is deterministic: score 1.0 only if from is 0xd8da6bf26964af9d7eed9e03e53415d37aa96045, to is 0xdac17f958d2ee523a2206206994597c13d831ec7, and the returned hash matches the requested 0xad7e0411...df1f; 0.0 for any other addresses, placeholder data, or an error."
+  "llmRubric": "This queries an immutable mined Ethereum transaction, so the answer is deterministic: score 1.0 only if data.transaction is a non-null object whose hash matches the requested 0x80bcde339d13869c243853ee419d8f8f0d7ccd9f99add4642d269c521a2b5c5d, whose from address is 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 (case-insensitive), and whose block number corresponds to 25632324; score 0.0 if transaction is null, addresses differ, or the data looks like placeholders."
 }
