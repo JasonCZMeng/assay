@@ -1,0 +1,28 @@
+# npm Trusted Publishing (OIDC) — no tokens anywhere. Requires each package's npmjs.com
+# settings page to list this repo + workflow as a Trusted Publisher (one-time toggle).
+# Release by pushing a tag: guard-v0.2.0 publishes middleware/, mcp-v0.2.0 publishes mcp/.
+name: publish
+on:
+  push:
+    tags: ["guard-v*", "mcp-v*"]
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      # npm ≥ 11.5 exchanges the workflow's OIDC identity for publish auth automatically.
+      - run: npm install -g npm@latest
+      - name: Pick package dir from tag
+        id: dir
+        run: echo "dir=$([[ "$GITHUB_REF_NAME" == guard-* ]] && echo middleware || echo mcp)" >> "$GITHUB_OUTPUT"
+      - run: npm ci
+        working-directory: ${{ steps.dir.outputs.dir }}
+      - run: npm publish
+        working-directory: ${{ steps.dir.outputs.dir }}
