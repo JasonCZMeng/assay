@@ -211,6 +211,17 @@ describe("server", () => {
     expect(bulk.evidence.url_template).toContain("/score?service=");
   });
 
+  it("serves llms.txt with the endpoints an agent needs", async () => {
+    const db = openDb(":memory:");
+    const res = await buildApp(db).request("/llms.txt");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/plain");
+    const body = await res.text();
+    expect(body).toContain("/SKILL.md");
+    expect(body).toContain("/score?service=");
+    expect(body).toContain("/tiers?services=");
+  });
+
   it("bulk /tiers rejects missing and oversized requests", async () => {
     const db = openDb(":memory:");
     const app = buildApp(db);

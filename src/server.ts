@@ -195,6 +195,31 @@ export function buildApp(db: Database.Database, opts: AppOpts = {}): Hono {
   app.get("/SKILL.md", serveSkill);
   app.get("/skill.md", serveSkill);
 
+  // llms.txt convention (llmstxt.org): a compact plain-text site guide for LLM agents.
+  app.get("/llms.txt", (c) =>
+    c.body(
+      `# Assay — x402 service-quality oracle
+
+Quality scores for x402 services, earned by paying them and verifying what comes back.
+Every score is backed by real paid probes with on-chain settlement receipts on Base.
+
+## Endpoints
+- ${config.publicUrl}/SKILL.md — full agent guide (markdown)
+- ${config.publicUrl}/tier/{url-encoded service URL} — free tier verdict (gold/ok/avoid/unrated)
+- ${config.publicUrl}/tiers?services={a,b,c} — free bulk ranking, max 50 (comma-separated, each URL-encoded)
+- ${config.publicUrl}/score?service={url-encoded service URL} — full evidence report, x402-paid ($0.005 USDC, Base)
+- ${config.publicUrl}/leaderboard — every scored service, ranked (HTML)
+- ${config.publicUrl}/api/digests — Bitcoin-anchored daily corpus digests (verify evidence predates claims)
+
+## Tooling
+- MCP server: npx -y assay-oracle-mcp (tools: check_service, rank_services, get_score, top_services)
+- Spend guard: npm install assay-x402-guard (wrapFetchWithAssay, rankCandidates, purchaseScore)
+`,
+      200,
+      { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=3600" }
+    )
+  );
+
   // Brand icon (see icon.ts): PNG is what the Bazaar iconUrl points at, SVG is the crisp
   // favicon source. Cache hard — the asset only changes with a deploy.
   app.get("/icon.png", (c) =>
