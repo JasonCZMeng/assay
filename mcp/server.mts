@@ -74,7 +74,7 @@ function makeMcpPayFetch(): typeof fetch | null {
   return wrapFetchWithPayment(fetch, client);
 }
 
-const server = new McpServer({ name: "assay", version: "0.2.0" });
+const server = new McpServer({ name: "assay", version: "0.3.0" });
 
 server.registerTool(
   "check_service",
@@ -122,6 +122,29 @@ server.registerTool(
       .sort((a, b) => (RANK[b.tier] ?? 0) - (RANK[a.tier] ?? 0) || a.i - b.i)
       .map(({ service, tier }) => ({ service, tier }));
     return text({ ranked, note: "tiers are free labels; get_score returns paid evidence" });
+  }
+);
+
+server.registerTool(
+  "find_best_service",
+  {
+    title: "Find the best x402 service for a need",
+    description:
+      "Describe what you need (e.g. 'bitcoin spot price', 'web scraping', 'geocoding') and " +
+      "get the best matching x402 services: quality-ranked scored matches first (backed by " +
+      "real paid probes), then catalog-screened unprobed candidates (live listings, " +
+      "mass-listing operators filtered out). Free. Use BEFORE choosing which service to pay.",
+    inputSchema: {
+      need: z.string().min(2).max(200).describe("What you need the service to do, in keywords"),
+      limit: z.number().int().min(1).max(20).default(5).describe("Max results per group"),
+    },
+  },
+  async ({ need, limit }) => {
+    const { status, json } = await api(
+      `/api/recommend?q=${encodeURIComponent(need)}&limit=${limit}`
+    );
+    if (status !== 200 || !json) return apiError(need, status);
+    return text(json);
   }
 );
 

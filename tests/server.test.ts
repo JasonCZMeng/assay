@@ -233,6 +233,36 @@ describe("server", () => {
     expect((await app.request(`/tier/${encodeURIComponent("https://ghost.example/x")}`)).status).toBe(404);
   });
 
+  it("recommends best scored services for a need, with catalog-screened fallbacks", async () => {
+    const db = openDb(":memory:");
+    const now = Date.now();
+    const mkRaw = (desc: string, payTo = "0xOp1") =>
+      JSON.stringify({ accepts: [{ payTo }], description: desc });
+    const ins = db.prepare(
+      "INSERT INTO services (id, domain, status, price_usdc, first_seen, last_seen, raw) VALUES (?,?,?,?,?,?,?)"
+    );
+    ins.run("https://good.example/btc", "good.example", "curated", 0.002, 1, now, mkRaw("Bitcoin spot price feed"));
+    ins.run("https://meh.example/btc", "meh.example", "curated", 0.002, 1, now, mkRaw("bitcoin price api"));
+    ins.run("https://fresh.example/btc", "fresh.example", "discovered", 0.001, now - 86400000, now, mkRaw("realtime bitcoin price"));
+    ins.run("https://dead.example/btc", "dead.example", "discovered", 0.001, 1, now - 10 * 86400000, mkRaw("bitcoin price"));
+    db.prepare(
+      "INSERT INTO scores (service_id, ts, composite, components, n_probes, trend) VALUES (?,?,?,'{}',30,0)"
+    ).run("https://good.example/btc", now, 95);
+    db.prepare(
+      "INSERT INTO scores (service_id, ts, composite, components, n_probes, trend) VALUES (?,?,?,'{}',30,0)"
+    ).run("https://meh.example/btc", now, 55);
+    const app = buildApp(db);
+    const res = await app.request("/api/recommend?q=bitcoin%20price");
+    expect(res.status).toBe(200);
+    const j: any = await res.json();
+    expect(j.scored[0].service).toBe("https://good.example/btc");
+    expect(j.scored[0].tier).toBe("gold");
+    expect(j.scored[1].tier).toBe("avoid");
+    // dead.example churned out of the catalog >48h ago — screened from candidates.
+    expect(j.candidates.map((c: any) => c.service)).toEqual(["https://fresh.example/btc"]);
+    expect((await app.request("/api/recommend")).status).toBe(400);
+  });
+
   it("serves llms.txt with the endpoints an agent needs", async () => {
     const db = openDb(":memory:");
     const res = await buildApp(db).request("/llms.txt");
