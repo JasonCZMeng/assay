@@ -370,6 +370,23 @@ Every score is backed by real paid probes with on-chain settlement receipts on B
 
   app.get("/dashboard", (c) => c.html(DASHBOARD_HTML));
 
+  // Operator service-counts, memoized: one GROUP BY over the whole catalog every 15 min
+  // instead of a full scan per candidate per request (which timed out at 14k live rows).
+  let opCounts: { at: number; map: Map<string, number> } | null = null;
+  const operatorCount = (payTo: string): number => {
+    if (!opCounts || Date.now() - opCounts.at > 15 * 60_000) {
+      const map = new Map<string, number>();
+      for (const r of db
+        .prepare(
+          "SELECT json_extract(raw, '$.accepts[0].payTo') p, COUNT(*) n FROM services GROUP BY p"
+        )
+        .all() as any[])
+        if (r.p) map.set(String(r.p), r.n);
+      opCounts = { at: Date.now(), map };
+    }
+    return opCounts.map.get(payTo) ?? 0;
+  };
+
   // Answer "which service should I call for X?" — the selection moment every agent
   // framework currently leaves to the model guessing over a raw catalog dump. Scored
   // matches rank by composite; unprobed matches are catalog-screened (live within 48h,
@@ -381,25 +398,19 @@ Every score is backed by real paid probes with on-chain settlement receipts on B
     if (!words.length) return c.json({ error: "empty query" }, 400);
     const limit = Math.min(Number(c.req.query("limit")) || 5, 20);
     const now = Date.now();
-    const match = (raw: string, id: string) => {
-      let desc = "";
-      try {
-        desc = String(JSON.parse(raw)?.description ?? "");
-      } catch {
-        /* unparsable raw — match on id only */
-      }
-      const hay = (desc + " " + id).toLowerCase();
+    const match = (desc: string | null, id: string) => {
+      const hay = ((desc ?? "") + " " + id).toLowerCase();
       return words.reduce((n, w) => n + (hay.includes(w) ? 1 : 0), 0);
     };
     const scored = (db
       .prepare(
-        `SELECT s.id, s.raw, s.price_usdc, sc.composite FROM services s
-         JOIN scores sc ON sc.service_id = s.id
+        `SELECT s.id, json_extract(s.raw, '$.description') descr, s.price_usdc, sc.composite
+         FROM services s JOIN scores sc ON sc.service_id = s.id
          WHERE s.status = 'curated'
            AND sc.ts = (SELECT MAX(ts) FROM scores WHERE service_id = s.id)`
       )
       .all() as any[])
-      .map((r) => ({ r, m: match(r.raw, r.id) }))
+      .map((r) => ({ r, m: match(r.descr, r.id) }))
       .filter((x) => x.m > 0)
       .sort((a, b) => b.m - a.m || (b.r.composite ?? -1) - (a.r.composite ?? -1))
       .slice(0, limit)
@@ -411,26 +422,13 @@ Every score is backed by real paid probes with on-chain settlement receipts on B
       }));
     const candidates = (db
       .prepare(
-        `SELECT id, raw, price_usdc, first_seen FROM services
-         WHERE status = 'discovered' AND ? - last_seen < ${48 * 3600000}`
+        `SELECT id, json_extract(raw, '$.description') descr,
+                json_extract(raw, '$.accepts[0].payTo') payto, price_usdc, first_seen
+         FROM services WHERE status = 'discovered' AND ? - last_seen < ${48 * 3600000}`
       )
       .all(now) as any[])
-      .map((r) => ({ r, m: match(r.raw, r.id) }))
-      .filter((x) => {
-        if (x.m === 0) return false;
-        try {
-          const payTo = JSON.parse(x.r.raw)?.accepts?.[0]?.payTo;
-          if (!payTo) return true;
-          const op = db
-            .prepare(
-              "SELECT COUNT(*) n FROM services WHERE json_extract(raw, '$.accepts[0].payTo') = ?"
-            )
-            .get(payTo) as { n: number };
-          return op.n <= 25; // screen out listing factories
-        } catch {
-          return true;
-        }
-      })
+      .map((r) => ({ r, m: match(r.descr, r.id) }))
+      .filter((x) => x.m > 0 && (!x.r.payto || operatorCount(x.r.payto) <= 25))
       .sort((a, b) => b.m - a.m || b.r.first_seen - a.r.first_seen)
       .slice(0, limit)
       .map(({ r }) => ({
