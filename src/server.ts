@@ -232,7 +232,45 @@ Every score is backed by real paid probes with on-chain settlement receipts on B
   app.get("/tier/:id", (c) => {
     const id = c.req.param("id");
     const s = latestScore(db, id);
-    if (!s) return c.json({ error: "unknown service" }, 404);
+    if (!s) {
+      // Catalog-derived signals for services we've ingested but never probed: half the
+      // Bazaar is dead listings and some operators mass-produce hundreds of clones, so
+      // listing age, churn, and operator concentration are real signal — and they cost
+      // nothing, because the ingest already collects them. Turns "unknown" from a dead
+      // end into a verdict for every live catalog entry.
+      const svc = db
+        .prepare("SELECT domain, first_seen, last_seen, raw FROM services WHERE id = ?")
+        .get(id) as { domain: string; first_seen: number; last_seen: number; raw: string } | undefined;
+      if (!svc) return c.json({ error: "unknown service" }, 404);
+      let payTo: string | null = null;
+      try {
+        payTo = JSON.parse(svc.raw)?.accepts?.[0]?.payTo ?? null;
+      } catch {
+        /* malformed raw — operator signals just omit */
+      }
+      const op = payTo
+        ? (db
+            .prepare(
+              "SELECT COUNT(*) n, COUNT(DISTINCT domain) d FROM services WHERE json_extract(raw, '$.accepts[0].payTo') = ?"
+            )
+            .get(payTo) as { n: number; d: number })
+        : null;
+      const now = Date.now();
+      c.header("Cache-Control", "public, max-age=3600");
+      return c.json({
+        service: id,
+        tier: "unknown",
+        catalog: {
+          listedDays: Math.floor((now - svc.first_seen) / 86400000),
+          lastSeenHoursAgo: Math.floor((now - svc.last_seen) / 3600000),
+          listingStatus: now - svc.last_seen < 48 * 3600000 ? "live" : "churned",
+          ...(op
+            ? { operator: { services: op.n, domains: op.d, massListing: op.n > 25 } }
+            : {}),
+        },
+        note: "catalog-derived signals only — Assay has not yet paid and probed this service",
+      });
+    }
     c.header("Cache-Control", "public, max-age=3600");
     // The free label carries its own upsell: agents that want proof shouldn't have to
     // find the paid endpoint by reading docs.

@@ -63,6 +63,13 @@ USDC on \`eip155:8453\`); pay with any x402 client (e.g. \`wrapFetchWithPayment\
 \`{"service": ..., "tier": "gold" | "ok" | "avoid" | "unrated"}\` — gold ≥ 85, ok ≥ 60,
 otherwise avoid; unrated while composite is null. Cacheable for 1 hour.
 
+For catalogued services Assay has not yet probed, returns \`tier: "unknown"\` plus free
+\`catalog\` signals derived from continuous Bazaar ingestion: \`listedDays\`,
+\`lastSeenHoursAgo\`, \`listingStatus\` ("live" | "churned" — half the catalog is dead
+listings), and \`operator\` concentration (\`services\`, \`domains\`, \`massListing\` — some
+operators mass-produce hundreds of near-identical endpoints). Use these to filter the
+long tail before anyone pays anything.
+
 ### \`GET /tiers?services={a,b,c}\` — free
 
 Bulk form of \`/tier\` — rank a whole candidate list in one call. \`services\` is a

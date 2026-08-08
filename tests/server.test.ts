@@ -211,6 +211,28 @@ describe("server", () => {
     expect(bulk.evidence.url_template).toContain("/score?service=");
   });
 
+  it("serves catalog-derived signals for discovered-but-unprobed services", async () => {
+    const db = openDb(":memory:");
+    const raw = JSON.stringify({ accepts: [{ payTo: "0xOperatorA" }] });
+    const now = Date.now();
+    const ins = db.prepare(
+      "INSERT INTO services (id, domain, status, first_seen, last_seen, raw) VALUES (?,?,?,?,?,?)"
+    );
+    // 30 sibling services from one operator on one domain — a listing factory.
+    for (let i = 0; i < 30; i++)
+      ins.run(`https://farm.example/api/${i}`, "farm.example", "discovered", now - 12 * 86400000, now - 3600000, raw);
+    const app = buildApp(db);
+    const res = await app.request(`/tier/${encodeURIComponent("https://farm.example/api/1")}`);
+    expect(res.status).toBe(200);
+    const j: any = await res.json();
+    expect(j.tier).toBe("unknown");
+    expect(j.catalog.listedDays).toBe(12);
+    expect(j.catalog.listingStatus).toBe("live");
+    expect(j.catalog.operator).toEqual({ services: 30, domains: 1, massListing: true });
+    // Truly absent services still 404.
+    expect((await app.request(`/tier/${encodeURIComponent("https://ghost.example/x")}`)).status).toBe(404);
+  });
+
   it("serves llms.txt with the endpoints an agent needs", async () => {
     const db = openDb(":memory:");
     const res = await buildApp(db).request("/llms.txt");
