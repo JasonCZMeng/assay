@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wallet Ledger</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header>
+    <h1>Wallet Ledger</h1>
+    <nav id="tabs">
+      <button data-tab="ledger">Ledger</button>
+      <button data-tab="graph">Flow map</button>
+      <button data-tab="offramps">Off-ramps</button>
+      <button data-tab="labels">Labels</button>
+      <button data-tab="setup">Setup</button>
+    </nav>
+    <div class="sync">
+      <span id="sync-status" class="muted"></span>
+      <button id="sync-btn" class="primary">Sync all</button>
+    </div>
+  </header>
+  <main id="view"></main>
+
+  <dialog id="label-dialog">
+    <form method="dialog" id="label-form">
+      <h2>Label address</h2>
+      <label>Address <input name="address" required pattern="0x[0-9a-fA-F]{40}" spellcheck="false"></label>
+      <label>Label <input name="label" required maxlength="80" placeholder="Coinbase deposit (Acme)"></label>
+      <label>Group <input name="group" maxlength="80" placeholder="Coinbase — clusters bubbles on the flow map"></label>
+      <label>Category <select name="category"></select></label>
+      <label class="check"><input type="checkbox" name="isOfframp"> Off-ramp (fiat exit: exchange deposit, off-ramp provider)</label>
+      <label>Controlled by <select name="entityId"></select></label>
+      <p class="hint">Set "Controlled by" when this external account is yours — e.g. the corporate Coinbase account. Off-ramps are checked against it.</p>
+      <label>Notes <textarea name="notes" rows="2" maxlength="500"></textarea></label>
+      <div class="row end">
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button value="save" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="tooltip" hidden></div>
+  <script src="/d3.min.js"></script>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
